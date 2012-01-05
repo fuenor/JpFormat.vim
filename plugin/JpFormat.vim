@@ -536,7 +536,7 @@ function! JpFormatAll(fline, lline, mode, ...)
   endif
   echo 'JpFormat : Restore to its original state...'
   let [glist, lines, delmarker] = JpJoinStr(fline, lline)
-  let elen = elen - delmarker * crlen
+  let elen -= delmarker
   let marker = g:JpFormatMarker
   if a:mode
     let g:JpFormatMarker = ''
@@ -684,8 +684,8 @@ function! JpFormatExec(fline, lline)
   let elen = line2byte(cline) + col('.') - 1
 
   let [glist, lines, delmarker] = JpJoinStr(fline, lline)
+  let elen = elen - delmarker
   let lline = fline + lines - 1
-  let elen = elen - delmarker * crlen
   let clidx = elen - line2byte(fline)
 
   let b:jpformat = g:JpAutoFormat
@@ -718,7 +718,7 @@ function! JpJoinExec(fline, lline)
   let elen = line2byte(line('.'))+col('.')-1
 
   let [glist, lines, delmarker] = JpJoinStr(fline, lline)
-  let elen = elen - delmarker * crlen
+  let elen -= delmarker
   let lline = fline + lines - 1
 
   if glist == getline(fline, lline)
@@ -738,11 +738,9 @@ function! JpJoinStr(fline, lline, ...)
   let fline = a:fline
   let lline = a:lline
   let cline = line('.')
-  if a:0 == 3
-    let clidx = a:3
-  endif
   let clidx = cline - fline
   let delmarker = 0
+  let delindent = 0
 
   let eol = g:JpJoinEOL.'$'
   let tol = '^'.g:JpJoinTOL
@@ -767,7 +765,10 @@ function! JpJoinStr(fline, lline, ...)
       let lines = lines + 1
       let str = getline(fline+lines)
       if indent != ''
-        let str = substitute(getline(fline+lines), '^\s*', '', '')
+        if fline+lines <= cline
+          let delindent += strlen(matchstr(str, '^\s*'))
+        endif
+        let str = substitute(str, '^\s*', '', '')
       endif
       let glist[idx] = glist[idx] . str
       if lines <= clidx
@@ -797,8 +798,11 @@ function! JpJoinStr(fline, lline, ...)
     let lines = lines + 1
     let idx = idx + 1
   endwhile
+  let crlen = strlen(g:JpFormatMarker)
+  let crlen += &ff=='dos' ? 2 : 1
   let lline = fline + lines - 1
-  return [glist, lines, delmarker]
+  let ofs = a:0 ? delmarker : delindent + delmarker * crlen
+  return [glist, lines, ofs]
 endfunction
 
 " リストを整形
@@ -1428,7 +1432,7 @@ function! EVwrite_txt(file, fline, lline)
   let line = line('.')
 
   if g:EV_JoinStr && exists('b:jpformat')
-    let [glist, lines, delmarker] = JpJoinStr(a:fline, a:lline)
+    let [glist, lines, delmarker] = JpJoinStr(a:fline, a:lline, 'marker')
     let line -= delmarker
     let removeMarker = 0
     let catmarker=''
