@@ -132,21 +132,29 @@ endif
 if !exists('JpNoDiv')
   let JpNoDiv = '―…‥'
   if &enc == 'utf-8'
-    let JpNoDiv .= '—〳〴〵'
+    let JpNoDiv .= '—'
   endif
   let JpNoDiv = '['.JpNoDiv.']'
 endif
-
-" 追い出し用 (現在はJpKinsokuを使用しているため無視される)
-" ぶら下がり文字数を超えている時、JpKinsokuO以外の1文字を足して追い出す。
-" 通常はJpKinsokuと同じ
-if !exists('JpKinsokuO')
-  let JpKinsokuO = '-!?}>－ｰ～！？゛゜ゝゞ）］｡｣､･ﾞﾟヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々‐・:;.°￠′″‰℃、。，．,)\]｝〕〉》」』】〟’”≫―…‥'
+" 分離不可
+if !exists('JpNoDivPair')
+  let JpNoDivPair = ''
   if &enc == 'utf-8'
-    let JpKinsokuO .= 'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ〻゠–〜¢ℓ㏋‼⁇⁈⁉〙〗｠»—〳〴〵'
+    let JpNoDivPair .= '〳〴〵'
   endif
-  let JpKinsokuO = '['.JpKinsokuO.']'
+  let JpNoDivPair = '['.JpNoDivPair.']'
 endif
+" 追い出し用
+" ぶら下がり文字数を超えている時、JpKinsokuO以外の1文字を足して追い出す。
+" 未設定時にはJpKinsokuで代用される。
+if !exists('JpKinsokuO')
+  " let JpKinsokuO = '-!?}>－ｰ～！？゛゜ゝゞ）］｡｣､･ﾞﾟヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々‐・:;.°￠′″‰℃、。，．,)\]｝〕〉》」』】〟’”≫―…‥'
+  " if &enc == 'utf-8'
+  "   let JpKinsokuO .= 'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ〻゠–〜¢ℓ㏋‼⁇⁈⁉〙〗｠»—〳〴〵'
+  " endif
+  " let JpKinsokuO = '['.JpKinsokuO.']'
+endif
+
 " 整形対象外行の正規表現
 if !exists('JpFormatExclude')
   let JpFormatExclude = ''
@@ -499,9 +507,10 @@ function! JpFormatAll(fline, lline, mode, ...)
   let fline = a:fline
   let lline = a:lline
   let cline = line('.')
+  let ccol = col('.')
   let crlen = strlen(g:JpFormatMarker)
   let crlen += &ff=='dos' ? 2 : 1
-  let elen = line2byte(cline) + col('.') - 1
+  let elen = line2byte(cline) + ccol - 1
   let saved_JpCountChars     = b:JpCountChars
   let saved_JpCountLines     = b:JpCountLines
   let saved_JpCountOverChars = b:JpCountOverChars
@@ -535,18 +544,34 @@ function! JpFormatAll(fline, lline, mode, ...)
     return
   endif
   echo 'JpFormat : Restore to its original state...'
-  let [glist, lines, delmarker] = JpJoinStr(fline, lline)
-  let elen -= delmarker
+
+  let [glist, lines, delmarker] = JpJoinStr(fline, lline, 'marker')
+  let clidx = 0
+  if fline <= cline && lline >= cline
+    let clidx = cline - fline - delmarker
+  endif
+
   let marker = g:JpFormatMarker
   if a:mode
     let g:JpFormatMarker = ''
     let crlen = &ff=='dos' ? 2 : 1
   endif
   redraw| echo 'JpFormat : Formatting...'
-  let clidx = elen - line2byte(fline)
   let b:jpformat = g:JpAutoFormat
-  let [glist, addmarker]= JpFormatStr(glist, clidx)
-  let elen = elen + addmarker * crlen
+  let cfline = search('[^'.g:JpFormatMarker.']$', 'ncbW') + 1
+  if cfline < fline
+    let cfline = fline
+  endif
+  if fline <= cline && lline >= cline
+    let cstr = join(getline(cfline, cline-1)).strpart(getline(cline), 0, ccol-1)
+    let cstr = substitute(cstr, '\s\+', '', 'g').matchstr(cstr, '\s\+$')
+  endif
+  let [glist, cmarker] = JpFormatStr(glist, clidx)
+  if fline <= cline && lline >= cline
+    let elen = InsertPointgq(glist[cmarker :], cstr)
+  elseif lline < cline
+    let elen += strlen(join(glist)) - strlen(join(getline(fline, lline)))
+  endif
   let g:JpFormatMarker = marker
 
   let lines = len(glist)
@@ -561,6 +586,9 @@ function! JpFormatAll(fline, lline, mode, ...)
   endif
 
   call s:setline(glist, fline, lline)
+  if fline <= cline && lline >= cline
+    let elen += line2byte(cmarker+fline)
+  endif
   exec elen.'go'
   if s:debug
     echo 'JpFormat : Done. ('.reltimestr(reltime(start)).' sec )'
@@ -685,16 +713,14 @@ function! JpFormatExec(fline, lline)
 
   let [glist, lines, delmarker] = JpJoinStr(fline, lline)
   let elen = elen - delmarker
-  let lline = fline + lines - 1
   let clidx = elen - line2byte(fline)
+  let lline = fline + lines - 1
 
   let b:jpformat = g:JpAutoFormat
-  let [glist, addmarker]= JpFormatStr(glist, clidx)
-
-  let crlen = strlen(g:JpFormatMarker)
-  let crlen += &ff=='dos' ? 2 : 1
-  let elen = elen + addmarker * crlen
-
+  let cstr = strpart(join(glist), 0, clidx)
+  let cstr = substitute(cstr, '\s\+', '', 'g').matchstr(cstr, '\s\+$')
+  let [glist, cline] = JpFormatStr(glist, cline)
+  let elen = InsertPointgq(glist, cstr) + line2byte(fline)
   if glist == getline(fline, lline)
     return 0
   endif
@@ -812,9 +838,13 @@ function! JpFormatStr(str, clidx, ...)
   let idx = 0
   let JpKinsoku  = '^'.g:JpKinsoku.'\+'
   let JpKinsokuO = g:JpKinsoku.'\+$'
+  if exists('g:JpKinsokuO')
+    let JpKinsokuO = g:JpKinsokuO.'\+$'
+  endif
   let JpKinsokuS = g:JpKinsoku.'\+$'
   let JpKinsokuE = g:JpKinsokuE.'\+$'
   let JpNoDiv = g:JpNoDiv.'\+$'
+  let JpNoDivPair = g:JpNoDivPair.'\+$'
   let JpNoDivL = '^'.g:JpNoDiv.'\+'
   let JpNoDivN = g:JpNoDivN.g:JpNoDiv.'\{2}$'
   let cmode = g:JpFormatCountMode
@@ -825,18 +855,17 @@ function! JpFormatStr(str, clidx, ...)
   let catmarker = g:JpFormatMarker
   let addcr = 0
   let crlen = &ff=='dos' ? 2 : 1
-  let bidx = 0
   if chars <= 0
-    return [a:str, addcr]
+    return [a:str, 0]
   endif
   for l in range(len(a:str))
+    let addline = l < clidx ? 1 : 0
     let lstr = a:str[l]
     if lstr == '' || lstr =~ b:JpFormatExclude
-      let clidx -= strlen(a:str[l]) + crlen
+      let addcr += addline
       call add(fstr, lstr)
       continue
     endif
-    let bidx = 0
     let chars  = (b:JpCountChars)*cmode
     let indent  = a:0 ? '' : matchstr(lstr, '^\s*')
     let sindent = a:0 ? '' : matchstr(lstr, '^\s*')
@@ -859,6 +888,7 @@ function! JpFormatStr(str, clidx, ...)
       endif
       let lstr = strpart(lstr, strlen(str))
       if lstr == ''
+        let addcr += addline
         call add(fstr, indent.str)
         break
       endif
@@ -868,9 +898,8 @@ function! JpFormatStr(str, clidx, ...)
         let str = strpart(str, 0, strlen(str)-strlen(ostr))
         let lstr = ostr.lstr
         if str != ''
-          let bidx += strlen(str)
-          let addcr += (clidx-bidx) > 0 ? 1 : 0
           let str = str . catmarker
+          let addcr += addline
           call add(fstr, indent.str)
           continue
         endif
@@ -899,23 +928,40 @@ function! JpFormatStr(str, clidx, ...)
 
       " 追い出し処理
       let outstr = 1
-      " 分離不可文字は境界で2文字単位で扱う
-      " TODO:分離不可文字の種類を区別していない
+
+      " 分離不可文字は境界で2文字単位で追い出し
       if ochars > 0
-        let ostr = substitute(str, '\%>'.chars.'v.*','','')
-        if ostr =~ JpNoDiv
-          let olen = strlen(ostr)
-          " let ochar = matchstr(ostr, '.\{1}$')
-          let nstr = strpart(str, olen)
-          " let nchar = matchstr(nstr, '.\{1}$')
-          if match(nstr, '^'.g:JpNoDiv.'\{2}') > -1
-            let lstr = strpart(str, olen).lstr
-            let str = strpart(str, 0, olen)
-            let outstr = 0
+        let div = 0
+        if g:JpNoDiv != '' && str =~ JpNoDiv
+          let dchar = matchstr(str, '.$')
+          if lstr =~ '^'.dchar && strlen(substitute(matchstr(str, dchar.'\+$'), '.', '.', 'g')) % 2
+            let str .= dchar
+            let lstr = substitute(lstr, '^.', '', '')
+            let div = 1
+          endif
+        elseif g:JpNoDivPair != '' && str =~ g:JpNoDivPair.'$'
+          if lstr =~ '^'.g:JpNoDivPair && strlen(substitute(matchstr(str, g:JpNoDivPair.'\+$'), '.', '.', 'g')) % 2
+            let str .= matchstr(lstr, '^.')
+            let lstr = substitute(lstr, '^.', '', '')
+            let div = 1
+          endif
+        endif
+        if div
+          " lstrの行頭禁則文字を全て現在行へ移動
+          if lstr =~ JpKinsoku
+            let ostr = matchstr(str, '.\{1}$').matchstr(lstr, JpKinsoku)
+            " 句点関係があったらそこまで
+            if ostr =~ g:JpKutenParen
+              let ostr = strpart(ostr, 0, matchend(ostr, g:JpKutenParen.'\+'))
+            endif
+            let ostr = strpart(ostr, strlen(matchstr(str, '.\{1}$')))
+            let str = str.ostr
+            let lstr = strpart(lstr, strlen(ostr))
           endif
         endif
       endif
 
+      " ぶら下がり文字数を超えている時、JpKinsokuO以外の1文字を足して追い出す。
       if outstr && ochars >= 0
         if substitute(str, '\%>'.(chars+ochars).'v.*','','') != str
           let ostr = matchstr(str, JpKinsokuO)
@@ -936,18 +982,16 @@ function! JpFormatStr(str, clidx, ...)
         let str = substitute(lstr, '\%>'.chars.'v.*','','')
         let lstr = strpart(lstr, strlen(str))
       endif
-      let bidx += strlen(str)
       if lstr != ''
-        let addcr += (clidx-bidx) > 0 ? 1 : 0
         let str = str . catmarker
       endif
+      let addcr += addline
       call add(fstr, indent.str)
       if strlen(lstr) == ''
         break
       endif
       let indent = sindent
     endwhile
-    let clidx -= strlen(a:str[l]) + crlen
   endfor
   return [fstr, addcr]
 endfunction
@@ -1028,7 +1072,7 @@ function! JpCountPages(fline, lline, mode, ...)
   endfor
   redraw|echo 'JpCount : Formatting...'
   let b:jpformat = g:JpAutoFormat
-  let [glist, addmarker] = JpFormatStr(glist, 0)
+  let [glist, cline] = JpFormatStr(glist, 0)
 
   let lines = len(glist)
   let pages = lines/b:JpCountLines + (lines % b:JpCountLines > 0)
@@ -1239,7 +1283,6 @@ function! s:JpFormatGqExec(mode, lines, lnum, col)
   endif
 
   if cpoint && s:InsertPoint == -1
-    let s:InsertPoint = elen
     let gstr = getline(fline, eline)
     let elen = line2byte(fline)
     let s:InsertPoint = InsertPointgq(gstr, cstr) + elen
