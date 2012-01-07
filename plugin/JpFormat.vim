@@ -179,8 +179,10 @@ endif
 
 " Jコマンド代替
 if (!exists('JpAltJ') || JpAltJ) && JpFormatMarker != ''
-  noremap <silent> J :JpAltJ<CR>
+  nnoremap <silent> J :<C-u>JpAltJ<CR>
+  vnoremap <silent> J :call JpAltJ()<CR>
 endif
+
 " C-v代替
 if (!exists('JpAltCv') || JpAltCv)
   nnoremap <silent> <expr> <C-v> JpAltCv()
@@ -188,12 +190,17 @@ endif
 " gq実行時にJpFormatをオフにする
 " if (exists('JpAltgq') && JpAltgq) || (!exists('JpAltgq') && has('Kaoriya') && !exists('plugin_format_disable'))
 if (exists('JpAltgq') && JpAltgq)
-  nnoremap <silent> <expr> gq JpFormat_cmd("gq")
+  " nnoremap <silent> <expr> gq JpFormat_cmd("gq")
 endif
+
 " DELコマンド代替
-if (exists('JpAltDEL') && JpAltDEL== 0) && JpFormatMarker != '' && JpFormatCursorMovedI
-  inoremap <silent> <DEL> <C-r>=JpAltDEL()<CR>
+if (exists('JpAltDEL') && JpAltDEL) && JpFormatMarker != '' && JpFormatCursorMovedI
+  inoremap <silent> <expr> <DEL> "<C-r>=JpAltDEL()<CR>"
 endif
+
+function! JpFormatChk()
+  return (!exists('b:jpformat') || b:jpformat == 0 || g:JpFormatMarker != '')
+endfunction
 
 " <C-v>コマンド代替
 command! -range JpAltCv call JpAltCv(<line1>, <line2>)
@@ -1102,49 +1109,32 @@ function! JpCountPages(fline, lline, mode, ...)
 endfunction
 
 " J コマンド代替
-command! -count JpAltJ call JpAltJ(<line1>, <line2>)
-function! JpAltJ(fline, lline)
-  if !exists('b:jpformat')
-    silent exec 'normal! '.cnt.'J'
-    return
+command! -count JpAltJ call JpAltJ()
+function! JpAltJ() range
+  let cnt = count
+  let fline = a:firstline
+  let lline = a:lastline
+  if count
+    let lline = lline + count - 1
   endif
-  let fline = a:fline
-  let lline = a:lline
-  let lline = lline > line('$') ? line('$') : lline
-  let save_cursor = getpos(".")
-  let cnt = lline - fline + 1
-
-  if cnt < 0
-    let cnt = 1
+  if fline != lline
+    let cnt = lline-fline+1
   endif
-  let l:JpFormatExclude = b:JpFormatExclude
-  if b:JpFormatGqMode
-    let lline = fline + lline - 1
-    let chars = 64  " 番兵(4は改行文字分)
-    for n in range(fline, lline)
-      let chars += strlen(getline(n)) + 4
-    endfor
-    call cursor(fline, 1)
-    let b:jpf_saved_tw=&textwidth
-    silent! exec 'setlocal textwidth='.chars
-    silent exec 'normal! '.cnt.'gqq'
-    silent! exec 'setlocal textwidth='.b:jpf_saved_tw
-    let l:JpFormatExclude = '^$'
-  endif
-  if g:JpFormatMarker != '' && b:jpformat > 0
-    let lline = fline + lline - 1
+  if exists('b:jpformat') && b:jpformat == 1 && g:JpFormatMarker != ''
+    let save_cursor = getpos(".")
+    let l:JpFormatExclude = b:JpFormatExclude
     let glist = getline(fline, lline)
-    let loop = len(glist)
-    let loop = loop > 1 ? loop -1 : loop
-    for i in range(loop)
+    let lines = lline - fline - 1
+    let lines = lines > 0 ? lines : 0
+    for i in range(0, lines)
       if glist[i] != l:JpFormatExclude
         let glist[i] = substitute(glist[i], g:JpFormatMarker.'$', '', '')
       endif
     endfor
     call setline(fline, glist)
+    call setpos('.', save_cursor)
   endif
-  call setpos('.', save_cursor)
-  silent exec 'normal! '.cnt.'J'
+  exe 'normal! '.cnt.'J'
 endfunction
 
 " マーカーが存在するなら自動整形をON
