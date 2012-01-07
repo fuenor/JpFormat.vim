@@ -4,7 +4,7 @@
 "
 " === Modify start
 " Maintainer:   <fuenor@gmail.com>
-" Description:  日本語gqコマンドスクリプト Version. 1.00
+" Description:  日本語gqコマンドスクリプト Version. 1.01
 "               (動作にはJpFormat.vimが必要)
 "
 "               autofmt.vimの compat.vim を改変したスクリプト。
@@ -233,21 +233,50 @@ function! s:lib.format_insert_mode(char)
   return a:char
 endfunction
 
+" === Modify start
+function! s:vimformatexpr(lnum, count, ...)
+  let lnum = a:lnum
+  let saved_tw  = &textwidth
+  let saved_fex = &formatexpr
+  call cursor(lnum, 1)
+  exe 'setlocal formatexpr='
+  if a:0
+    exe 'setlocal textwidth='.a:1
+  endif
+  silent! exe 'silent! normal! '.a:count.'gqq'
+  exe 'setlocal textwidth='.saved_tw
+  exe 'setlocal formatexpr='.saved_fex
+  let l = line('.') - lnum + 1
+  return l
+endfunction
+" === Modify end
+
 function! s:lib.format_lines(lnum, count)
   let lnum = a:lnum
   let prev_lines = line('$')
+
   let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
   let lines = getline(lnum, lnum + a:count - 1)
-  let line = self.join_lines(lines)
-  call setline(lnum, line)
-  if a:count > 1
-    silent! execute printf('silent %ddelete _ %d', lnum + 1, a:count - 1)
-  endif
+  " === Modify start
+  " let line = self.join_lines(lines)
+  " call setline(lnum, line)
+  " if a:count > 1
+  "   silent! execute printf('silent %ddelete _ %d', lnum + 1, a:count - 1)
+  " endif
+  let tw = strlen(join(lines)) + a:count*4 + 64
+  let l = s:vimformatexpr(lnum, a:count, tw)
+  " === Modify end
   while 1
     let line = getline(lnum)
     " === Modify start
     let compat = 1
-    if line =~ '[^[:print:]]'
+    if line =~ '^[[:print:]]*$'
+      let cnt = lnum-a:lnum
+      let l = s:vimformatexpr(lnum, cnt)
+      break
+    " endif
+    " if line =~ '[^[:print:]]'
+    elseif strlen(self.retab(matchstr(getline(lnum), '^\s*'))) < self.textwidth
       let s:JpFormatCountMode = g:JpFormatCountMode
       let g:JpFormatCountMode = 1
       let s:JpCountChars      = exists('b:JpCountChars') ? b:JpCountChars : g:JpCountChars
@@ -270,7 +299,25 @@ function! s:lib.format_lines(lnum, count)
       endif
     endif
     if compat
-      " compat.vim本来の処理を実行
+      " Vimデフォルト整形
+      " let line = self.join_lines(lines)
+      " call setline(lnum, line)
+      " if a:count > 1
+      "   silent! execute printf('silent %ddelete _ %d', lnum + 1, a:count - 1)
+      " endif
+      " let cnt = lnum-a:lnum
+      " let l = s:vimformatexpr(lnum, cnt)
+      " if l == 1
+      "   break
+      " else
+      "   let tw = strlen(join(getline(lnum+1, lnum+l))) + l*4 + 64
+      "   let l = s:vimformatexpr(lnum+1, l-1, tw)
+      "   let lnum += 1
+      "   let fo_2 = -1
+      "   call cursor(lnum, 1)
+      "   continue
+      " endif
+      " compat.vim本来の処理
       let col = self.find_boundary(line)
       if col == -1
         break
