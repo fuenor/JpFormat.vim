@@ -2,17 +2,21 @@
 "    Description: 日本語文書整形プラグイン
 "     Maintainer: <fuenor@gmail.com>
 "                 http://sites.google.com/site/fudist/Home/jpformat
-"        Version: 1.18
 "=============================================================================
 scriptencoding utf-8
+let s:Version = 1.19
 
-if exists("loaded_JpFormat") && !exists('fudist')
-  finish
-endif
 if exists('disable_JpFormat') && disable_JpFormat
   finish
 endif
-let loaded_JpFormat = 1
+if exists('g:JpFormat_version') && g:JpFormat_version < s:Version
+  let g:loaded_JpFormat = 0
+endif
+if exists("g:loaded_JpFormat") && g:loaded_JpFormat && !exists('fudist')
+  finish
+endif
+let g:JpFormat_version = s:Version
+let g:loaded_JpFormat = 1
 if &cp
   finish
 endif
@@ -46,7 +50,7 @@ if !exists('JpCountOverChars')
 endif
 " 原稿用紙換算計算時に削除するルビ等の正規表現
 if !exists('JpCountDeleteReg')
-  let JpCountDeleteReg = '\[[^]]\+\]\|<[^>]\+>\|《[^》]\+》\|［[^］]\+］\|｜'
+  let JpCountDeleteReg = '\[.\{-}\]\|<.\{-}>\|《.\{-}》\|［.\{-}］\|｜'
 endif
 
 " 連結マーカー
@@ -265,11 +269,12 @@ endfunction
 augroup JpFormat_
   au!
   " 挿入モードから抜けると自動整形
-  au InsertEnter  * call JpFormatEnter()
-  au InsertLeave  * call JpFormatLeave()
-  au VimEnter     * call JpFormatInit()
-  au BufNew,BufNewFile,BufWinEnter * call JpFormatInit()
-  au CursorMovedI * call JpFormatCursorMovedI_()
+  au InsertEnter        * call JpFormatEnter()
+  au InsertLeave        * call JpFormatLeave()
+  au VimEnter           * call JpFormatInit()
+  au BufNew,BufWinEnter * call JpFormatInit()
+  au BufNewFile,BufRead * call JpFormatInit()
+  au CursorMovedI       * call JpFormatCursorMovedI_()
 augroup END
 
 if JpKinsoku == ''
@@ -321,17 +326,17 @@ function! JpFormatInit()
   if !exists('b:JpCountOverChars')
     let b:JpCountOverChars = g:JpCountOverChars
   endif
-  if !exists('b:sline')
-    let b:sline = line('.')
-    let b:prevtime = localtime()
-    let b:prevstr = []
-    let b:pline = line('.')
-    let b:pcol  = col('.')
-    let b:pmarker = getline(b:pline-1) =~ g:JpFormatMarker."$"
+  if !exists('b:jpf_sline')
+    let b:jpf_sline = line('.')
+    let b:jpf_modified = &modified
+    let b:jpf_prevtime = localtime()
+    let b:jpf_prevstr = []
+    let b:jpf_pline = line('.')
+    let b:jpf_pcol  = col('.')
+    let b:jpf_pmarker = getline(b:jpf_pline-1) =~ g:JpFormatMarker."$"
     if g:JpFormatMarker == ''
-      let b:pmarker = 0
+      let b:jpf_pmarker = 0
     endif
-    " let b:markerline = 0
   endif
   if !exists('b:JpFormatGqMode')
     let b:JpFormatGqMode = g:JpFormatGqMode
@@ -349,7 +354,7 @@ function! JpFormatCursorMovedI_()
     call JpFormatCursorMovedI()
     return
   endif
-  let altch = b:pmarker && line('.') == b:pline - 1 && b:pcol == 1 && col('.') != col('$')
+  let altch = b:jpf_pmarker && line('.') == b:jpf_pline - 1 && b:jpf_pcol == 1 && col('.') != col('$')
   if (exists('JpAltBS') && JpAltBS==0)
     let altch = 0
   endif
@@ -373,11 +378,11 @@ function! JpFormatCursorMovedI_()
       call JpFormat(line('.'), line('.'), 0)
     endif
   endif
-  let b:pline = line('.')
-  let b:pcol  = col('.')
-  let b:pmarker = getline(b:pline-1) =~ g:JpFormatMarker."$"
+  let b:jpf_pline = line('.')
+  let b:jpf_pcol  = col('.')
+  let b:jpf_pmarker = getline(b:jpf_pline-1) =~ g:JpFormatMarker."$"
   if g:JpFormatMarker == ''
-    let b:pmarker = 0
+    let b:jpf_pmarker = 0
   endif
 endfunction
 
@@ -388,8 +393,8 @@ silent! function JpFormatEnter()
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
-  let b:saved_tw=&textwidth
-  let b:saved_bs=&backspace
+  let b:jpf_saved_tw=&textwidth
+  let b:jpf_saved_bs=&backspace
   if b:jpformat < 1
     return
   endif
@@ -397,14 +402,14 @@ silent! function JpFormatEnter()
   if g:JpFormatCursorMovedI
     setlocal backspace=indent,eol,start
   endif
-  let b:sline = line('.')
+  let b:jpf_sline = line('.')
   let fline = line('.')
   let lline = line('.')
-  let b:pline = line('.')
-  let b:pcol  = col('.')
-  let b:pmarker = getline(b:pline-1) =~ g:JpFormatMarker."$"
+  let b:jpf_pline = line('.')
+  let b:jpf_pcol  = col('.')
+  let b:jpf_pmarker = getline(b:jpf_pline-1) =~ g:JpFormatMarker."$"
   if g:JpFormatMarker == ''
-    let b:pmarker = 0
+    let b:jpf_pmarker = 0
   endif
   let lines = 1
   let l:JpAutoJoin = g:JpAutoJoin
@@ -412,9 +417,11 @@ silent! function JpFormatEnter()
     let l:JpAutoJoin = 0
   endif
   if l:JpAutoJoin
-    let b:prevtime = localtime()
-    let b:prevstr = getline(1, line('$'))
-    " let b:markerline = getline(line('.')) =~ g:JpFormatMarker.'$'
+    let b:jpf_modified = &modified
+    let b:jpf_prevtime = localtime()
+    if b:jpf_modified == 0
+      let b:jpf_prevstr = getline(1, line('$'))
+    endif
   endif
   if b:jpformat > 0
     if l:JpAutoJoin == 1 || l:JpAutoJoin == 3
@@ -430,7 +437,7 @@ silent! function JpFormatEnter()
         call JpJoinGq(fline, lline, 0)
       else
         call JpJoin(fline, lline)
-        let b:sline = line('.')
+        let b:jpf_sline = line('.')
       endif
     endif
   endif
@@ -441,8 +448,8 @@ silent! function JpFormatLeave()
     let b:jpformat = 0
   endif
   if b:jpformat <= 0
-    silent! exec 'setlocal textwidth='.b:saved_tw
-    silent! exec 'setlocal backspace='.b:saved_bs
+    silent! exec 'setlocal textwidth='.b:jpf_saved_tw
+    silent! exec 'setlocal backspace='.b:jpf_saved_bs
     if b:jpformat <= -1
       let b:jpformat = 1
     endif
@@ -453,14 +460,13 @@ silent! function JpFormatLeave()
   endif
   let l:JpAutoJoin = g:JpAutoJoin
   if l:JpAutoJoin
-    " if b:markerline && b:prevstr == getline(1, line('$'))
-    if b:prevstr == getline(1, line('$'))
+    if b:jpf_modified == 0 && b:jpf_prevstr == getline(1, line('$'))
       let save_cursor = getpos(".")
       let ptime = localtime()
-      let utime = localtime() - b:prevtime + 1
+      let utime = localtime() - b:jpf_prevtime + 1
       silent! exec 'earlier '.utime.'s'
       for i in range(20)
-        if b:prevstr == getline(1, line('$'))
+        if b:jpf_prevstr == getline(1, line('$'))
           break
         endif
         silent! exec 'redo'
@@ -468,8 +474,8 @@ silent! function JpFormatLeave()
       call setpos('.', save_cursor)
     endif
   endif
-  silent! exec 'setlocal textwidth='.b:saved_tw
-  silent! exec 'setlocal backspace='.b:saved_bs
+  silent! exec 'setlocal textwidth='.b:jpf_saved_tw
+  silent! exec 'setlocal backspace='.b:jpf_saved_bs
 endfunction
 
 " 指定範囲以降を整形
@@ -1007,11 +1013,11 @@ silent! function JpFormatInsertLeave()
   endif
   let fline = line('.')
   let lline = line('.')
-  if fline > b:sline
-    let fline = b:sline
+  if fline > b:jpf_sline
+    let fline = b:jpf_sline
   endif
-  if lline < b:sline
-    let lline = b:sline
+  if lline < b:jpf_sline
+    let lline = b:jpf_sline
   endif
 
   if b:JpFormatGqMode
@@ -1114,15 +1120,15 @@ function! JpAltJ(fline, lline)
   let l:JpFormatExclude = b:JpFormatExclude
   if b:JpFormatGqMode
     let lline = fline + lline - 1
-    let chars = 64
+    let chars = 64  " 番兵(4は改行文字分)
     for n in range(fline, lline)
-      let chars += strlen(getline(n))
+      let chars += strlen(getline(n)) + 4
     endfor
     call cursor(fline, 1)
-    let b:saved_tw=&textwidth
+    let b:jpf_saved_tw=&textwidth
     silent! exec 'setlocal textwidth='.chars
     silent exec 'normal! '.cnt.'gqq'
-    silent! exec 'setlocal textwidth='.b:saved_tw
+    silent! exec 'setlocal textwidth='.b:jpf_saved_tw
     let l:JpFormatExclude = '^$'
   endif
   if g:JpFormatMarker != '' && b:jpformat > 0
@@ -1171,8 +1177,8 @@ endfunction
 command! -bang -range JpFormatGq call JpFormatGq(<line1>, <line2>, <bang>0)
 function!  JpFormatGq(fline, lline, mode, ...)
   let b:jpformat = 1
-  let b:saved_tw=&textwidth
-  let b:saved_fex=&formatexpr
+  let b:jpf_saved_tw=&textwidth
+  let b:jpf_saved_fex=&formatexpr
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
@@ -1189,10 +1195,10 @@ function!  JpFormatGq(fline, lline, mode, ...)
   let lines = a:lline-a:fline+1
 
   if a:0
-    let chars = 64  " 番兵
+    let chars = 64  " 番兵(4は改行文字分)
     for n in range(a:fline, a:lline)
       let str = getline(n)
-      let chars += strlen(str)
+      let chars += strlen(str) + 4
     endfor
     silent! exec 'setlocal textwidth='.chars
   endif
@@ -1209,8 +1215,8 @@ function!  JpFormatGq(fline, lline, mode, ...)
   if s:InsertPoint > -1
     exec s:InsertPoint.'go'
   endif
-  silent! exec 'setlocal formatexpr='.b:saved_fex
-  silent! exec 'setlocal textwidth='.b:saved_tw
+  silent! exec 'setlocal formatexpr='.b:jpf_saved_fex
+  silent! exec 'setlocal textwidth='.b:jpf_saved_tw
 endfunction
 
 function! s:JpFormatGqExec(mode, lines, lnum, col)
