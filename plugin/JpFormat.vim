@@ -865,7 +865,7 @@ function! JpFormatStr(str, clidx, ...)
   " let chars  = (b:JpCountChars)*cmode-hankakuover
   let chars  = (b:JpCountChars)*cmode
   let ochars = (b:JpCountOverChars)*cmode
-  let catmarker = g:JpFormatMarker
+  let catmarker = a:0 ? '' : g:JpFormatMarker
   let addcr = 0
   let crlen = &ff=='dos' ? 2 : 1
   if chars <= 0

@@ -2,7 +2,7 @@
 " License:      This file is placed in the public domain.
 " Last Change:  2011-05-15
 "
-" === Modify start
+" " === Modify start
 " Maintainer:   <fuenor@gmail.com>
 " Description:  日本語gqコマンドスクリプト Version. 1.01
 "               (動作にはJpFormat.vimが必要)
@@ -10,25 +10,17 @@
 "               autofmt.vimの compat.vim を改変したスクリプト。
 "               JpFormat.vimの整形関数を利用して高速に日本語整形を行う
 "               https://github.com/vim-scripts/autofmt/blob/master/autoload/autofmt/compat.vim
-"               (改変部分は Modify を検索して参照)
 "
-" Install:      以下をVimの設定ファイルへ追加するとJpFormat.vimで整形処理に使
+" Install:
+"               formatexprを設定すると通常のgqコマンドとして使用できます。
+"                 set formatexpr=jpfmt#formatexpr()
+"
+"               以下をVimの設定ファイルへ追加するとJpFormat.vimで整形処理に使
 "               用されます。
 "                 let JpFormatGqMode      = 1
 "                 let JpFormat_formatexpr = 'jpfmt#formatexpr()'
 "
-"               formatexprを設定すると通常のgqコマンドとして使用できます。
-"                 set formatexpr=jpfmt#formatexpr()
-"
-"
-" FIXME: autofmt.vim側の処理が遅すぎる
-"
-" インデントを無視する(テスト用)
-if !exists('JpFormatIgnoreIndent')
-  let JpFormatIgnoreIndent = 0
-endif
-" === Modify end
-"
+" " === Modify end
 " Options:
 "
 "   None
@@ -106,18 +98,18 @@ endif
 let s:cpo_save = &cpo
 set cpo&vim
 
-function! jpfmt#formatexpr()
+function jpfmt#formatexpr()
   return s:lib.formatexpr()
 endfunction
 
-function! jpfmt#import()
+function jpfmt#import()
   return s:lib
 endfunction
 
 if exists('*strdisplaywidth')
   let s:strdisplaywidth = function('strdisplaywidth')
 else
-  function! s:strdisplaywidth(str, ...)
+  function s:strdisplaywidth(str, ...)
     let vcol = get(a:000, 0, 0)
     let w = 0
     for c in split(a:str, '\zs')
@@ -139,7 +131,7 @@ endif
 
 let s:lib = {}
 
-function! s:lib.formatexpr()
+function s:lib.formatexpr()
   if mode() =~# '[iR]' && self.has_format_options('a')
     " When 'formatoptions' have "a" flag (paragraph formatting), it is
     " impossible to format using User Function.  Paragraph is concatenated to
@@ -160,7 +152,7 @@ function! s:lib.formatexpr()
   return 0
 endfunction
 
-function! s:lib.format_normal_mode(lnum, count)
+function s:lib.format_normal_mode(lnum, count)
   let self.textwidth = self.comp_textwidth(1)
 
   if self.textwidth == 0
@@ -196,7 +188,7 @@ function! s:lib.format_normal_mode(lnum, count)
   execute printf('keepjumps normal! %dG', lnum)
 endfunction
 
-function! s:lib.format_insert_mode(char)
+function s:lib.format_insert_mode(char)
   " @warning char can be "" when completion is used
   " @return a:char for debug
 
@@ -235,6 +227,9 @@ endfunction
 
 " === Modify start
 function! s:vimformatexpr(lnum, count, ...)
+  if a:count == 0
+    return 1
+  endif
   let lnum = a:lnum
   let saved_tw  = &textwidth
   let saved_fex = &formatexpr
@@ -251,10 +246,9 @@ function! s:vimformatexpr(lnum, count, ...)
 endfunction
 " === Modify end
 
-function! s:lib.format_lines(lnum, count)
+function s:lib.format_lines(lnum, count)
   let lnum = a:lnum
   let prev_lines = line('$')
-
   let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
   let lines = getline(lnum, lnum + a:count - 1)
   " === Modify start
@@ -263,20 +257,19 @@ function! s:lib.format_lines(lnum, count)
   " if a:count > 1
   "   silent! execute printf('silent %ddelete _ %d', lnum + 1, a:count - 1)
   " endif
-  let tw = strlen(join(lines)) + a:count*4 + 64
+  let tw = strlen(join(lines))
   let l = s:vimformatexpr(lnum, a:count, tw)
   " === Modify end
+
   while 1
     let line = getline(lnum)
     " === Modify start
-    let compat = 1
+    let compat = 2
     if line =~ '^[[:print:]]*$'
-      let cnt = lnum-a:lnum
-      let l = s:vimformatexpr(lnum, cnt)
+      let l = s:vimformatexpr(lnum, 1)
       break
-    " endif
-    " if line =~ '[^[:print:]]'
-    elseif strlen(self.retab(matchstr(getline(lnum), '^\s*'))) < self.textwidth
+    endif
+    if strlen(self.retab(matchstr(line, '^\s*'))) < self.textwidth-1
       let s:JpFormatCountMode = g:JpFormatCountMode
       let g:JpFormatCountMode = 1
       let s:JpCountChars      = exists('b:JpCountChars') ? b:JpCountChars : g:JpCountChars
@@ -287,50 +280,47 @@ function! s:lib.format_lines(lnum, count)
       let [glist, addmarker]  = JpFormatStr([line], 0, 'gq')
       let g:JpFormatCountMode = s:JpFormatCountMode
       let b:JpCountChars      = s:JpCountChars
-      if len(glist) <= 1
-        break
-      endif
-      let col = len(glist[0])
-      let line1 = substitute(glist[0], '\s*$', '', '')
+
+      let line1 = glist[0]
+      let col = strlen(glist[0])
+      let line2 = strpart(line, col)
+      let line2 = substitute(line2, '^\s*', '', '')
       " 分割位置が日本語の時だけJpFormatの整形を使用
-      if matchstr(line1, '.\{1}$') !~ '[[:print:]]' || matchstr(glist[1], '^.\{1}') !~ '[[:print:]]'
-        let line2 = substitute(strpart(line, col-1), '\s*$', '', '')
+      if len(glist) <= 1 || line1 =~ '[^[:print:]]$' || line2 =~ '^[^[:print:]]'
+        if len(glist) <= 1
+          break
+        endif
+        call setline(lnum, line1)
+        call append(lnum, line2)
         let compat = 0
       endif
     endif
-    if compat
-      " Vimデフォルト整形
-      " let line = self.join_lines(lines)
-      " call setline(lnum, line)
-      " if a:count > 1
-      "   silent! execute printf('silent %ddelete _ %d', lnum + 1, a:count - 1)
-      " endif
-      " let cnt = lnum-a:lnum
-      " let l = s:vimformatexpr(lnum, cnt)
-      " if l == 1
-      "   break
-      " else
-      "   let tw = strlen(join(getline(lnum+1, lnum+l))) + l*4 + 64
-      "   let l = s:vimformatexpr(lnum+1, l-1, tw)
-      "   let lnum += 1
-      "   let fo_2 = -1
-      "   call cursor(lnum, 1)
-      "   continue
-      " endif
-      " compat.vim本来の処理
+    if compat == 1
       let col = self.find_boundary(line)
       if col == -1
         break
       endif
       let line1 = substitute(line[: col - 1], '\s*$', '', '')
       let line2 = substitute(line[col :], '^\s*', '', '')
+      call setline(lnum, line1)
+      call append(lnum, line2)
+    elseif compat == 2
+      let l = s:vimformatexpr(lnum, 1)
+      let line1 = getline(lnum)
+      let col = l == 1 ? -1 : (strlen(getline(lnum)))
+      let line2 = substitute(line[col :], '^\s*', '', '')
+      if l > 1
+        silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
+        call append(lnum, line2)
+      else
+        break
+      endif
     endif
-    if g:JpFormatIgnoreIndent
-      let fo_2 = ''
-    endif
+    " let line1 = substitute(line[: col - 1], '\s*$', '', '')
+    " let line2 = substitute(line[col :], '^\s*', '', '')
+    " call setline(lnum, line1)
+    " call append(lnum, line2)
     " === Modify end
-    call setline(lnum, line1)
-    call append(lnum, line2)
     if fo_2 != -1
       let leader = fo_2
     else
@@ -343,7 +333,7 @@ function! s:lib.format_lines(lnum, count)
   return line('$') - prev_lines
 endfunction
 
-function! s:lib.find_boundary(line)
+function s:lib.find_boundary(line)
   let start_col = self.skip_leader(a:line)
   if start_col == len(a:line)
     return -1
@@ -384,7 +374,7 @@ function! s:lib.find_boundary(line)
   return -1
 endfunction
 
-function! s:lib.check_boundary(lst, i)
+function s:lib.check_boundary(lst, i)
   " Check whether a line can be broken before lst[i].
   "
   " @param  lst   line as List of Dictionary
@@ -414,7 +404,7 @@ function! s:lib.check_boundary(lst, i)
   return "allow_break_before"
 endfunction
 
-function! s:lib.skip_word(lst, i)
+function s:lib.skip_word(lst, i)
   " @return end_of_word + 1
 
   let [lst, i] = [a:lst, a:i + 1]
@@ -426,7 +416,7 @@ function! s:lib.skip_word(lst, i)
   return i
 endfunction
 
-function! s:lib.skip_space(lst, i)
+function s:lib.skip_space(lst, i)
   let [lst, i] = [a:lst, a:i]
   while i < len(lst) && lst[i].c =~ '\s'
     let i += 1
@@ -434,7 +424,7 @@ function! s:lib.skip_space(lst, i)
   return i
 endfunction
 
-function! s:lib.skip_leader(line)
+function s:lib.skip_leader(line)
   let col = 0
   if self.is_comment_enabled()
     let [indent, com_str, mindent, text, com_flags] = self.parse_leader(a:line)
@@ -453,7 +443,7 @@ function! s:lib.skip_leader(line)
   return col
 endfunction
 
-function! s:lib.get_paragraph(lines)
+function s:lib.get_paragraph(lines)
   " @param  lines   List of String
   " @return         List of Paragraph
   "   [ [start_index, [line1 ,line2, ...]], ...]
@@ -522,7 +512,7 @@ function! s:lib.get_paragraph(lines)
   return res
 endfunction
 
-function! s:lib.join_lines(lines)
+function s:lib.join_lines(lines)
   " :join + remove comment leader
 
   let res = a:lines[0]
@@ -546,7 +536,7 @@ function! s:lib.join_lines(lines)
   return res
 endfunction
 
-function! s:lib.join_line(line1, line2)
+function s:lib.join_line(line1, line2)
   " Join two lines.
   "
   " Spaces at end of line1 and comment leader of line2 should be removed
@@ -574,14 +564,14 @@ endfunction
 " vim/src/options.c
 " Return TRUE if format option 'x' is in effect.
 " Take care of no formatting when 'paste' is set.
-function! s:lib.has_format_options(x)
+function s:lib.has_format_options(x)
   if &paste
     return 0
   endif
   return stridx(&formatoptions, a:x) != -1
 endfunction
 
-function! s:lib.is_comment_enabled()
+function s:lib.is_comment_enabled()
   if mode() == 'n'
     return self.has_format_options('q')
   else
@@ -589,12 +579,12 @@ function! s:lib.is_comment_enabled()
   endif
 endfunction
 
-function! s:lib.is_comment(line)
+function s:lib.is_comment(line)
   let com_str = self.parse_leader(a:line)[1]
   return com_str != ""
 endfunction
 
-function! s:lib.parse_leader(line)
+function s:lib.parse_leader(line)
   "  +-------- indent
   "  | +------ com_str
   "  | | +---- mindent
@@ -649,7 +639,7 @@ function! s:lib.parse_leader(line)
   return matchlist(a:line, '\v^(\s*)()()(.*)$')[1:4] + [""]
 endfunction
 
-function! s:lib.parse_opt_comments(comments)
+function s:lib.parse_opt_comments(comments)
   " @param  comments  'comments' option
   " @return           [[flags, str], ...]
 
@@ -664,7 +654,7 @@ function! s:lib.parse_opt_comments(comments)
   return res
 endfunction
 
-function! s:lib.find_three_piece_comments(comments, flags, str)
+function s:lib.find_three_piece_comments(comments, flags, str)
   let coms = self.parse_opt_comments(a:comments)
   for i in range(len(coms))
     if coms[i][0] == a:flags && coms[i][1] == a:str
@@ -679,7 +669,7 @@ function! s:lib.find_three_piece_comments(comments, flags, str)
   endfor
 endfunction
 
-function! s:lib.line2list(line)
+function s:lib.line2list(line)
   let res = []
   let [col, virtcol] = [0, 0]
   for c in split(a:line, '\zs')
@@ -696,11 +686,11 @@ function! s:lib.line2list(line)
   return res
 endfunction
 
-function! s:lib.list2line(lst)
+function s:lib.list2line(lst)
   return join(map(copy(a:lst), 'v:val.c'), '')
 endfunction
 
-function! s:lib.get_second_line_leader(lines)
+function s:lib.get_second_line_leader(lines)
   if !self.has_format_options('2') || len(a:lines) <= 1
     return -1
   endif
@@ -718,7 +708,7 @@ function! s:lib.get_second_line_leader(lines)
   return -1
 endfunction
 
-function! s:lib.make_leader(lnum)
+function s:lib.make_leader(lnum)
   let prev_line = getline(a:lnum - 1)
 
   if self.is_comment_enabled() && self.is_comment(prev_line)
@@ -743,7 +733,7 @@ function! s:lib.make_leader(lnum)
   return indent
 endfunction
 
-function! s:lib.make_comment_leader(line)
+function s:lib.make_comment_leader(line)
   let do_si = !&paste && &smartindent && !&cindent
   let [indent, com_str, mindent, text, com_flags] = self.parse_leader(a:line)
   let extra_space = ''
@@ -834,7 +824,7 @@ function! s:lib.make_comment_leader(line)
   return leader
 endfunction
 
-function! s:lib.copy_indent(line1, line2)
+function s:lib.copy_indent(line1, line2)
   " @return [copied_indent, rest_indent . text]
   let indent1 = matchstr(a:line1, '^\s*')
   let indent2 = matchstr(a:line2, '^\s*')
@@ -848,7 +838,7 @@ function! s:lib.copy_indent(line1, line2)
   return [indent, text]
 endfunction
 
-function! s:lib.retab(line, ...)
+function s:lib.retab(line, ...)
   let col = get(a:000, 0, 0)
   let expandtab = get(a:000, 1, &expandtab)
   let tabstop = get(a:000, 2, &tabstop)
@@ -871,7 +861,7 @@ function! s:lib.retab(line, ...)
   return s1 . s2 . t
 endfunction
 
-function! s:lib.get_opt(name)
+function s:lib.get_opt(name)
   return  get(w:, a:name,
         \ get(t:, a:name,
         \ get(b:, a:name,
@@ -886,7 +876,7 @@ endfunction
 "	if invalid value, use 0.
 "	Set default to window width (maximum 79) for "gq" operator.
 " @param ff   force formatting (for "gq" command)
-function! s:lib.comp_textwidth(ff)
+function s:lib.comp_textwidth(ff)
   let textwidth = &textwidth
 
   if textwidth == 0 && &wrapmargin
@@ -928,7 +918,7 @@ function! s:lib.comp_textwidth(ff)
 endfunction
 
 " FIXME: How to detect command-line window?
-function! s:lib.is_cmdwin()
+function s:lib.is_cmdwin()
 
   " workaround1
   "return bufname('%') == '[Command Line]'
@@ -954,7 +944,7 @@ endfunction
 
 " FIXME: This may break another :redir session?
 " It is useful if vim provide builtin function for this.
-function! s:lib.has_sign()
+function s:lib.has_sign()
   redir => s
   execute printf('silent sign place buffer=%d', bufnr('%'))
   redir END
@@ -963,7 +953,7 @@ function! s:lib.has_sign()
   return len(lines) > 1
 endfunction
 
-function! s:lib.comp_indent(lnum)
+function s:lib.comp_indent(lnum)
   if &indentexpr != ''
     if &paste
       return 0
@@ -994,7 +984,7 @@ function! s:lib.comp_indent(lnum)
   return 0
 endfunction
 
-function! s:lib.smartindent(lnum)
+function s:lib.smartindent(lnum)
   if &paste
     return 0
   endif
