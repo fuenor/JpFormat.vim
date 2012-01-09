@@ -226,7 +226,7 @@ function s:lib.format_insert_mode(char)
 endfunction
 
 " === Modify start
-function! s:vimformatexpr(lnum, count, ...)
+function! s:lib.vimformatexpr(lnum, count, ...)
   if a:count == 0
     return 1
   endif
@@ -244,29 +244,20 @@ function! s:vimformatexpr(lnum, count, ...)
   let l = line('.') - lnum + 1
   return l
 endfunction
-" === Modify end
 
-function s:lib.format_lines(lnum, count)
+function! s:lib.format_lines(lnum, count)
   let lnum = a:lnum
   let prev_lines = line('$')
   let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
   let lines = getline(lnum, lnum + a:count - 1)
-  " === Modify start
-  " let line = self.join_lines(lines)
-  " call setline(lnum, line)
-  " if a:count > 1
-  "   silent! execute printf('silent %ddelete _ %d', lnum + 1, a:count - 1)
-  " endif
   let tw = strlen(join(lines))
-  let l = s:vimformatexpr(lnum, a:count, tw)
-  " === Modify end
+  let l = self.vimformatexpr(lnum, a:count, tw)
 
   while 1
     let line = getline(lnum)
-    " === Modify start
     let compat = 2
     if line =~ '^[[:print:]]*$'
-      let l = s:vimformatexpr(lnum, 1)
+      let l = self.vimformatexpr(lnum, 1)
       break
     endif
     if strlen(self.retab(matchstr(line, '^\s*'))) < self.textwidth-1
@@ -305,7 +296,7 @@ function s:lib.format_lines(lnum, count)
       call setline(lnum, line1)
       call append(lnum, line2)
     elseif compat == 2
-      let l = s:vimformatexpr(lnum, 1)
+      let l = self.vimformatexpr(lnum, 1)
       let line1 = getline(lnum)
       let col = l == 1 ? -1 : (strlen(getline(lnum)))
       let line2 = substitute(line[col :], '^\s*', '', '')
@@ -316,11 +307,6 @@ function s:lib.format_lines(lnum, count)
         break
       endif
     endif
-    " let line1 = substitute(line[: col - 1], '\s*$', '', '')
-    " let line2 = substitute(line[col :], '^\s*', '', '')
-    " call setline(lnum, line1)
-    " call append(lnum, line2)
-    " === Modify end
     if fo_2 != -1
       let leader = fo_2
     else
@@ -332,6 +318,7 @@ function s:lib.format_lines(lnum, count)
   endwhile
   return line('$') - prev_lines
 endfunction
+" === Modify end
 
 function s:lib.find_boundary(line)
   let start_col = self.skip_leader(a:line)
