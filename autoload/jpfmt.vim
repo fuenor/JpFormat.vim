@@ -185,7 +185,7 @@ function s:lib.format_normal_mode(lnum, count)
 
   " The cursor is left on the first non-blank of the last formatted line.
   let lnum = a:lnum + (a:count - 1) + offset
-  execute printf('keepjumps normal! %dG', lnum)
+  silent! execute printf('keepjumps normal! %dG', lnum)
 endfunction
 
 function s:lib.format_insert_mode(char)
@@ -227,10 +227,10 @@ endfunction
 
 " === Modify start
 function! s:lib.vimformatexpr(lnum, count, ...)
-  if a:count == 0
+  let lnum = a:lnum
+  if a:count == 0 || lnum > line('$')
     return 1
   endif
-  let lnum = a:lnum
   let saved_tw  = &textwidth
   let saved_fex = &formatexpr
   call cursor(lnum, 1)
@@ -245,18 +245,43 @@ function! s:lib.vimformatexpr(lnum, count, ...)
   return l
 endfunction
 
+let s:lib.jpfmt_2ndleader = 1
+function! s:lib.get_2ndleader(lnum)
+  let lnum = a:lnum
+  if lnum < 0 || lnum > line('$')
+    return ''
+  endif
+  let saved_cursor = getpos(".")
+  let line = getline(lnum)
+  let tw = strlen(line)
+  let test = line . repeat('ﾝ', tw)
+  call setline(lnum, test)
+  let l = self.vimformatexpr(lnum, 1, tw)
+  call setline(lnum, line)
+  let leader2 = ''
+  if l > 1
+    let leader2 = substitute(getline(lnum+1), 'ﾝ\+$', '', '')
+    silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
+  endif
+  call setpos('.', saved_cursor)
+  return leader2
+endfunction
+
+let s:lib.jpfmt_compat = 2
 function! s:lib.format_lines(lnum, count)
   let lnum = a:lnum
   let prev_lines = line('$')
-  let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
+  if self.jpfmt_2ndleader == 0
+    let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
+  endif
   let lines = getline(lnum, lnum + a:count - 1)
   let tw = strlen(join(lines))
   let l = self.vimformatexpr(lnum, a:count, tw)
 
   while 1
     let line = getline(lnum)
-    let compat = 2
-    if line =~ '^[[:print:]]*$'
+    let compat = self.jpfmt_compat
+    if !(line =~ '[^[:print:]]')
       let l = self.vimformatexpr(lnum, 1)
       break
     endif
@@ -282,7 +307,6 @@ function! s:lib.format_lines(lnum, count)
           break
         endif
         call setline(lnum, line1)
-        call append(lnum, line2)
         let compat = 0
       endif
     endif
@@ -294,25 +318,27 @@ function! s:lib.format_lines(lnum, count)
       let line1 = substitute(line[: col - 1], '\s*$', '', '')
       let line2 = substitute(line[col :], '^\s*', '', '')
       call setline(lnum, line1)
-      call append(lnum, line2)
     elseif compat == 2
       let l = self.vimformatexpr(lnum, 1)
       let line1 = getline(lnum)
       let col = l == 1 ? -1 : (strlen(getline(lnum)))
       let line2 = substitute(line[col :], '^\s*', '', '')
-      if l > 1
-        silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
-        call append(lnum, line2)
-      else
+      if l == 1
         break
+      else
+        silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
       endif
     endif
-    if fo_2 != -1
-      let leader = fo_2
+    if self.jpfmt_2ndleader
+      let leader = self.get_2ndleader(lnum)
     else
-      let leader = self.make_leader(lnum + 1)
+      if fo_2 != -1
+        let leader = fo_2
+      else
+        let leader = self.make_leader(lnum + 1)
+      endif
     endif
-    call setline(lnum + 1, leader . line2)
+    call append(lnum, leader.line2)
     let lnum += 1
     let fo_2 = -1
   endwhile

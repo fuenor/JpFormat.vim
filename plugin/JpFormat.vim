@@ -80,6 +80,10 @@ if !exists('JpAutoJoin')
 endif
 
 " JpFormatGqMode = 0 のときインデントを有効にする
+" JpFormatGqMode = 0 のときインデントを有効にする
+" 0 : インデント等を使用しないで整形
+" 1 : インデント等をJpFormat_iformatexprで処理
+" 2 : インデント等を内部整形で対応
 if !exists('JpFormatIndent')
   let JpFormatIndent = 1
 endif
@@ -90,6 +94,9 @@ endif
 if !exists('JpFormat_formatexpr')
   " let JpFormat_formatexpr = 'jpfmt#formatexpr()'
   let JpFormat_formatexpr = ''
+endif
+if !exists('JpFormat_iformatexpr')
+  let g:JpFormat_iformatexpr = ''
 endif
 
 " 基本的な処理方法
@@ -373,10 +380,10 @@ function! JpFormatCursorMovedI_()
   elseif b:JpFormatGqMode
     call JpFormatGq(line('.'), line('.'), 0)
   else
-    if getline('.') =~ '^\s\+' && g:JpFormatIndent
+    if getline('.') =~ '^\s\+' && g:JpFormatIndent == 1
       let saved_fex=g:JpFormat_formatexpr
       let g:JpFormat_formatexpr = 'jpcpt#formatexpr()'
-      if exists('g:JpFormat_iformatexpr') && g:JpFormat_iformatexpr != ''
+      if g:JpFormat_iformatexpr != ''
         let g:JpFormat_formatexpr = g:JpFormat_iformatexpr
       endif
       call JpFormatGq(line('.'), line('.'), 0)
@@ -581,7 +588,7 @@ function! JpFormatAll(fline, lline, mode, ...)
   endif
   let [glist, cmarker] = JpFormatStr(glist, clidx)
   if fline <= cline && lline >= cline
-    let elen = InsertPointgq(glist[cmarker :], cstr)
+    let elen = s:InsertPointgq(glist[cmarker :], cstr)
   elseif lline < cline
     let elen += strlen(join(glist)) - strlen(join(getline(fline, lline)))
   endif
@@ -733,7 +740,7 @@ function! JpFormatExec(fline, lline)
   let cstr = strpart(join(glist), 0, clidx)
   let cstr = substitute(cstr, '\s\+', '', 'g').matchstr(cstr, '\s\+$')
   let [glist, cline] = JpFormatStr(glist, cline)
-  let elen = InsertPointgq(glist, cstr) + line2byte(fline)
+  let elen = s:InsertPointgq(glist, cstr) + line2byte(fline)
   if glist == getline(fline, lline)
     return 0
   endif
@@ -871,6 +878,7 @@ function! JpFormatStr(str, clidx, ...)
   if chars <= 0
     return [a:str, 0]
   endif
+  let defchars = (b:JpCountChars)*cmode
   for l in range(len(a:str))
     let addline = l < clidx ? 1 : 0
     let lstr = a:str[l]
@@ -879,22 +887,25 @@ function! JpFormatStr(str, clidx, ...)
       call add(fstr, lstr)
       continue
     endif
-    let chars  = (b:JpCountChars)*cmode
-    let indent  = a:0 ? '' : matchstr(lstr, '^\s*')
-    let sindent = a:0 ? '' : matchstr(lstr, '^\s*')
+    let leader  = a:0 ? '' : matchstr(lstr, '^\s*')
+    let sleader = a:0 ? '' : leader
     if g:JpFormatIndent == 0
-      let indent = ''
-      let sindent = ''
+      let leader = ''
+      let sleader = ''
     endif
-    if indent != ''
-      let col = strlen(indent)
+    if leader != ''
+      let col = strlen(leader)
       let lstr = lstr[col :]
-      let chars -= col
-      if chars < 1
-        let chars = 1
-      endif
     endif
     while 1
+      let chars = defchars
+      if leader != ''
+        let col = strlen(leader)
+        let chars -= col
+        if chars < 1
+          let chars = 1
+        endif
+      endif
       let str = substitute(lstr, '\%>'.chars.'v.*','','')
       if !g:JpFormatHankakuOver && str != '[[:print:]]$'
         let str = substitute(lstr, '\%>'.(chars-1).'v.*','','')
@@ -902,7 +913,7 @@ function! JpFormatStr(str, clidx, ...)
       let lstr = strpart(lstr, strlen(str))
       if lstr == ''
         let addcr += addline
-        call add(fstr, indent.str)
+        call add(fstr, leader.str)
         break
       endif
       " strの行末禁則文字を全て次行へ移動
@@ -913,7 +924,7 @@ function! JpFormatStr(str, clidx, ...)
         if str != ''
           let str = str . catmarker
           let addcr += addline
-          call add(fstr, indent.str)
+          call add(fstr, leader.str)
           continue
         endif
       endif
@@ -999,11 +1010,11 @@ function! JpFormatStr(str, clidx, ...)
         let str = str . catmarker
       endif
       let addcr += addline
-      call add(fstr, indent.str)
+      call add(fstr, leader.str)
       if strlen(lstr) == ''
         break
       endif
-      let indent = sindent
+      let leader = sleader
     endwhile
   endfor
   return [fstr, addcr]
@@ -1281,13 +1292,13 @@ function! s:JpFormatGqExec(mode, lines, lnum, col)
   if cpoint && s:InsertPoint == -1
     let gstr = getline(fline, eline)
     let elen = line2byte(fline)
-    let s:InsertPoint = InsertPointgq(gstr, cstr) + elen
+    let s:InsertPoint = s:InsertPointgq(gstr, cstr) + elen
   endif
 
   return [nline, lines, lnum]
 endfunction
 
-function! InsertPointgq(glist, cstr)
+function! s:InsertPointgq(glist, cstr)
   let glist = a:glist
   let maker = g:JpFormatMarker
   let crlen = strlen(g:JpFormatMarker)
@@ -1325,6 +1336,46 @@ endfunction
 
 function! JpJoinGq(fline, lline, mode)
   call JpFormatGq(a:fline, a:lline, a:mode, 'join')
+endfunction
+
+function! s:vimformatexpr(lnum, count, ...)
+  let lnum = a:lnum
+  if a:count == 0 || lnum > line('$')
+    return 1
+  endif
+  let saved_tw  = &textwidth
+  let saved_fex = &formatexpr
+  call cursor(lnum, 1)
+  exe 'setlocal formatexpr='
+  if a:0
+    exe 'setlocal textwidth='.a:1
+  endif
+  silent! exe 'silent! normal! '.a:count.'gqq'
+  exe 'setlocal textwidth='.saved_tw
+  exe 'setlocal formatexpr='.saved_fex
+  let l = line('.') - lnum + 1
+  return l
+endfunction
+
+function! s:get_2ndleader(lnum)
+  let lnum = a:lnum
+  if lnum < 0 || lnum > line('$')
+    return ''
+  endif
+  let saved_cursor = getpos(".")
+  let line = getline(lnum)
+  let tw = strlen(line)
+  let test = line . repeat('ﾝ', tw)
+  call setline(lnum, test)
+  let l = s:vimformatexpr(lnum, 1, tw)
+  call setline(lnum, line)
+  let leader2 = ''
+  if l > 1
+    let leader2 = substitute(getline(lnum+1), 'ﾝ\+$', '', '')
+    silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
+  endif
+  call setpos('.', saved_cursor)
+  return leader2
 endfunction
 
 "=============================================================================
