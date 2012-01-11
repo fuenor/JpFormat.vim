@@ -11,7 +11,6 @@
 "                 https://sites.google.com/site/fudist/Home/jpformat
 "
 " Install:
-"
 "               formatexprを設定すると通常のgqコマンドとして使用できます。
 "                 set formatexpr=jpfmt#formatexpr()
 "
@@ -24,12 +23,15 @@
 "                 let JpFormatGqMode      = 1
 "                 let JpFormat_formatexpr = 'jpfmt#formatexpr()'
 "
-" Customize:    日本語文書への対応として行頭の　(全角スペース)と「で始まった場
-"               合は段落開始とみなして処理を行います。
+" Customize:    日本語文書への対応として行頭の 　(全角スペース) か 「 で始まっ
+"               た場合は段落開始とみなして処理を行います。
 "               段落開始行は jpfmt_paragraph_regexp に正規表現を設定して指定可
 "               能です。
 "               不要な場合は '' を指定してください。
 "                 let jpfmt_paragraph_regexp = '^[　「]'
+"
+"               日本語の禁則処理にはJpFormat.vimがそのまま使用されているので、
+"               JpFormat.vimのオプションが有効です。
 "
 " Notice:       jpfmt.vimはautofmt.vimのcompat.vimを改変したスクリプトです。
 "                 https://github.com/vim-scripts/autofmt/blob/master/autoload/autofmt/compat.vim
@@ -297,8 +299,7 @@ function! s:lib.format_lines(lnum, count)
       if !exists('b:JpCountOverChars')
         let b:JpCountOverChars = g:JpCountOverChars
       endif
-      let jpfline = strpart(line, 0, b:JpCountChars*2)
-      let [glist, addmarker]  = JpFormatStr([jpfline], 0, 'gq')
+      let [glist, addmarker]  = JpFormatStr([line], 0, 'gq')
       let g:JpFormatCountMode = s:JpFormatCountMode
       let b:JpCountChars      = s:JpCountChars
       if len(glist) <= 1
