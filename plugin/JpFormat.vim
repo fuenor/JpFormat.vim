@@ -82,8 +82,8 @@ endif
 " JpFormatGqMode = 0 のときインデントを有効にする
 " JpFormatGqMode = 0 のときインデントを有効にする
 " 0 : インデント等を使用しないで整形
-" 1 : インデント等をJpFormat_iformatexprで処理
-" 2 : インデント等を内部整形で対応
+" 1 : インデント等を内部整形で対応
+" 2 : インデント等をJpFormat_iformatexprで処理
 if !exists('JpFormatIndent')
   let JpFormatIndent = 1
 endif
@@ -380,7 +380,7 @@ function! JpFormatCursorMovedI_()
   elseif b:JpFormatGqMode
     call JpFormatGq(line('.'), line('.'), 0)
   else
-    if getline('.') =~ '^\s\+' && g:JpFormatIndent == 1
+    if getline('.') =~ '^\s\+' && g:JpFormatIndent == 2
       let saved_fex=g:JpFormat_formatexpr
       let g:JpFormat_formatexpr = 'jpcpt#formatexpr()'
       if g:JpFormat_iformatexpr != ''
@@ -1040,8 +1040,14 @@ silent! function JpFormatInsertLeave()
 
   if b:JpFormatGqMode
     call JpFormatGq(line('.'), lline, 0)
-  elseif g:JpFormatCursorMovedI == 0
+  elseif g:JpFormatCursorMovedI == 0 && g:JpFormatIndent == 2
+    let saved_fex=g:JpFormat_formatexpr
+    let g:JpFormat_formatexpr = 'jpfmt#formatexpr()'
+    if g:JpFormat_iformatexpr != ''
+      let g:JpFormat_formatexpr = g:JpFormat_iformatexpr
+    endif
     call JpFormatGq(line('.'), lline, 0)
+    let g:JpFormat_formatexpr=saved_fex
   else
     let cline = JpFormatExec(fline, lline)
   endif
