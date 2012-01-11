@@ -24,8 +24,14 @@
 "                 let JpFormatGqMode      = 1
 "                 let JpFormat_formatexpr = 'jpfmt#formatexpr()'
 "
-" Notice:
-"               jpfmt.vimはautofmt.vimのcompat.vimを改変したスクリプトです。
+" Customize:    日本語文書への対応として行頭の　(全角スペース)と「で始まった場
+"               合は段落開始とみなして処理を行います。
+"               段落開始行は jpfmt_paragraph_regexp に正規表現を設定して指定可
+"               能です。
+"               不要な場合は '' を指定してください。
+"                 let jpfmt_paragraph_regexp = '^[　「]'
+"
+" Notice:       jpfmt.vimはautofmt.vimのcompat.vimを改変したスクリプトです。
 "                 https://github.com/vim-scripts/autofmt/blob/master/autoload/autofmt/compat.vim
 "
 "               改変部分は Modify を検索してください。
@@ -274,6 +280,7 @@ function! s:lib.format_lines(lnum, count)
   let lines = getline(lnum, lnum + a:count - 1)
   let tw = strlen(join(lines))
   let l = self.vimformatexpr(lnum, a:count, tw)
+  let tw = self.textwidth
 
   while 1
     let line = getline(lnum)
@@ -282,7 +289,7 @@ function! s:lib.format_lines(lnum, count)
       let l = self.vimformatexpr(lnum, 1)
       break
     endif
-    if compat != 3 && strlen(self.retab(matchstr(line, '^\s*'))) < self.textwidth-1
+    if compat != 3 && strlen(self.retab(matchstr(line, '^\s*[^[:space:]]'))) < self.textwidth-1
       let s:JpFormatCountMode = g:JpFormatCountMode
       let g:JpFormatCountMode = 1
       let s:JpCountChars      = exists('b:JpCountChars') ? b:JpCountChars : g:JpCountChars
@@ -290,7 +297,8 @@ function! s:lib.format_lines(lnum, count)
       if !exists('b:JpCountOverChars')
         let b:JpCountOverChars = g:JpCountOverChars
       endif
-      let [glist, addmarker]  = JpFormatStr([line], 0, 'gq')
+      let jpfline = strpart(line, 0, b:JpCountChars*2)
+      let [glist, addmarker]  = JpFormatStr([jpfline], 0, 'gq')
       let g:JpFormatCountMode = s:JpFormatCountMode
       let b:JpCountChars      = s:JpCountChars
       if len(glist) <= 1
@@ -317,7 +325,7 @@ function! s:lib.format_lines(lnum, count)
         silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
       endif
     elseif compat >= 2
-      let col = self.find_boundary(line)
+      let col = self.find_boundary(line[: self.textwidth*2])
       if col == -1
         break
       endif
@@ -384,9 +392,12 @@ function! s:lib.get_2ndleader(lnum)
   return leader2
 endfunction
 
+let s:lib.jpfmt_paragraph_regexp = '^[　「]'
 function! s:lib.get_vim_paragraph(fline, lline)
   let fline = a:fline
   let lline = a:lline
+  let sreg = self.get_opt('jpfmt_paragraph_regexp')
+  let sreg = sreg == '' ? '^$' : sreg
 
   let glist = getline(fline, lline)
   let res = []
@@ -425,6 +436,10 @@ function! s:lib.get_vim_paragraph(fline, lline)
     if cleader == '' && pleader == ' '
       let cleader = pleader
       let write = 0
+    endif
+
+    if glist[idx] =~ sreg
+      let write = 1
     endif
 
     if write
