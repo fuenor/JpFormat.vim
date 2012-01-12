@@ -557,10 +557,8 @@ function! JpFormatAll(fline, lline, mode, ...)
     endif
     let lines = line('$')
     let pages = lines/b:JpCountLines + (lines % b:JpCountLines > 0)
-    redraw| echom printf("[Easy mode] %d pages (%dx%d) : %d(%d) lines", pages, b:JpCountChars, b:JpCountLines, lines, lines % b:JpCountLines)
-    if s:debug
-      echo 'JpFormat(gq) : Done. ('.reltimestr(reltime(start)).' sec )'
-    endif
+    let dmsg = !s:debug ? '' : ' | ('.reltimestr(reltime(start)).' sec )'
+    redraw| echom printf("[Easy mode] %d pages (%dx%d) : %d(%d) lines %s", pages, b:JpCountChars, b:JpCountLines, lines, lines % b:JpCountLines, dmsg)
     return
   endif
   echo 'JpFormat : Restore to its original state...'
@@ -596,12 +594,12 @@ function! JpFormatAll(fline, lline, mode, ...)
 
   let lines = len(glist)
   let pages = lines/b:JpCountLines + (lines % b:JpCountLines > 0)
-  redraw| echom printf("[Easy mode] %d pages (%dx%d) : %d(%d) lines", pages, b:JpCountChars, b:JpCountLines, lines, lines % b:JpCountLines)
+  let dmsg = !s:debug ? '' : ' | ('.reltimestr(reltime(start)).' sec )'
+  redraw| echom printf("[Easy mode] %d pages (%dx%d) : %d(%d) lines %s", pages, b:JpCountChars, b:JpCountLines, lines, lines % b:JpCountLines, dmsg)
   " let b:JpCountChars     = saved_JpCountChars
   " let b:JpCountLines     = saved_JpCountLines
   " let b:JpCountOverChars = saved_JpCountOverChars
   if glist == getline(fline, lline)
-    echo 'JpFormat : Not modified. ('.reltimestr(reltime(start)).' sec )'
     return 0
   endif
 
@@ -610,9 +608,6 @@ function! JpFormatAll(fline, lline, mode, ...)
     let elen += line2byte(cmarker+fline)
   endif
   exec elen.'go'
-  if s:debug
-    echo 'JpFormat : Done. ('.reltimestr(reltime(start)).' sec )'
-  endif
 endfunction
 
 " パラグラフをフォーマット
@@ -747,9 +742,6 @@ function! JpFormatExec(fline, lline)
 
   call s:setline(glist, fline, lline)
   exec elen.'go'
-  if s:debug
-    " redraw| echo reltimestr(reltime(start)) 'sec'
-  endif
   return (lline - fline + 1)
 endfunction
 
@@ -773,9 +765,6 @@ function! JpJoinExec(fline, lline)
 
   call s:setline(glist, fline, lline)
   exec elen.'go'
-  if s:debug
-    " redraw| echo reltimestr(reltime(start)) 'sec'
-  endif
   return (lline-fline+1)
 endfunction
 
@@ -1106,23 +1095,18 @@ function! JpCountPages(fline, lline, mode, ...)
 
   let lines = len(glist)
   let pages = lines/b:JpCountLines + (lines % b:JpCountLines > 0)
-  redraw| echom printf("%d pages (%dx%d) : %d(%d) lines : %d/%d chars", pages, b:JpCountChars, b:JpCountLines, lines, lines % b:JpCountLines, wc, wc0)
+  let dmsg = !s:debug ? '' : ' | ('.reltimestr(reltime(start)).' sec )'
+  redraw| echom printf("%d pages (%dx%d) : %d(%d) lines : %d/%d chars %s", pages, b:JpCountChars, b:JpCountLines, lines, lines % b:JpCountLines, wc, wc0, dmsg)
   let b:JpCountChars     = saved_JpCountChars
   let b:JpCountLines     = saved_JpCountLines
   let b:JpCountOverChars = saved_JpCountOverChars
   let b:jpformat         = saved_jpformat
   if a:mode == 0 || glist == getline(fline, lline)
-    if s:debug
-      echo 'JpCount : Done. ('. reltimestr(reltime(start)) . ' sec )'
-    endif
     return
   endif
 
   call s:setline(glist, fline, lline)
   call cursor(fline, 1)
-  if s:debug
-    echo 'JpCount : Done. ('. reltimestr(reltime(start)) . ' sec )'
-  endif
 endfunction
 
 " J コマンド代替
@@ -1202,11 +1186,7 @@ function!  JpFormatGq(fline, lline, mode, ...)
   let lines = a:lline-a:fline+1
 
   if a:0
-    let chars = 64  " 番兵(4は改行文字分)
-    for n in range(a:fline, a:lline)
-      let str = getline(n)
-      let chars += strlen(str) + 4
-    endfor
+    let chars = strlen(join(getline(a:fline, a:lline)))
     silent! exec 'setlocal textwidth='.chars
   endif
 
@@ -1342,46 +1322,6 @@ endfunction
 
 function! JpJoinGq(fline, lline, mode)
   call JpFormatGq(a:fline, a:lline, a:mode, 'join')
-endfunction
-
-function! s:vimformatexpr(lnum, count, ...)
-  let lnum = a:lnum
-  if a:count == 0 || lnum > line('$')
-    return 1
-  endif
-  let saved_tw  = &textwidth
-  let saved_fex = &formatexpr
-  call cursor(lnum, 1)
-  exe 'setlocal formatexpr='
-  if a:0
-    exe 'setlocal textwidth='.a:1
-  endif
-  silent! exe 'silent! normal! '.a:count.'gqq'
-  exe 'setlocal textwidth='.saved_tw
-  exe 'setlocal formatexpr='.saved_fex
-  let l = line('.') - lnum + 1
-  return l
-endfunction
-
-function! s:get_2ndleader(lnum)
-  let lnum = a:lnum
-  if lnum < 0 || lnum > line('$')
-    return ''
-  endif
-  let saved_cursor = getpos(".")
-  let line = getline(lnum)
-  let tw = strlen(line)
-  let test = line . repeat('ﾝ', tw)
-  call setline(lnum, test)
-  let l = s:vimformatexpr(lnum, 1, tw)
-  call setline(lnum, line)
-  let leader2 = ''
-  if l > 1
-    let leader2 = substitute(getline(lnum+1), 'ﾝ\+$', '', '')
-    silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
-  endif
-  call setpos('.', saved_cursor)
-  return leader2
 endfunction
 
 "=============================================================================
