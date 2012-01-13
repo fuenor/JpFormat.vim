@@ -1,5 +1,5 @@
 " Maintainer:   <fuenor@gmail.com>
-" Description:  日本語gqコマンドスクリプト Version. 1.02
+" Description:  日本語gqコマンドスクリプト Version. 1.03
 "               日本語の禁則処理に対応した整形処理を行います。
 "
 " Caution:      !!!!!!!! 動作にはJpFormat.vimが必要です !!!!!!!!
@@ -24,6 +24,10 @@
 "               能です。
 "               不要な場合は '' を指定してください。
 "                 let jpfmt_paragraph_regexp = '^[　「]'
+"
+"               現在のカーソル行から次の段落行までを整形させることもできます。
+"               gqpなどにマップして使用すると便利かもしれません。
+"                 nnoremap <silent> gqp :<C-u>call jpfmt#gqp()<CR>
 "
 "               日本語の禁則処理にはJpFormat.vimがそのまま使用されているので、
 "               JpFormat.vimのオプションが有効です。
@@ -359,7 +363,7 @@ let s:lib.jpfmt_compat = 1
 function! s:lib.format_lines(lnum, count)
   let lnum = a:lnum
   let prev_lines = line('$')
-  let jpfmt_compat    = self.get_opt('jpfmt_compat')
+  let jpfmt_compat = self.get_opt('jpfmt_compat')
   if jpfmt_compat > 1
     let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
   endif
@@ -374,7 +378,7 @@ function! s:lib.format_lines(lnum, count)
   while 1
     let line = getline(lnum)
     let compat = jpfmt_compat
-    if compat == 1 && !(line =~ '[^[:print:]]'))
+    if compat == 1 && !(line =~ '[^[:print:]]')
       let l = self.vimformatexpr(lnum, 1, tw)
       break
     endif
@@ -422,6 +426,7 @@ function! s:lib.format_lines(lnum, count)
       call setline(lnum, line1)
     endif
     if jpfmt_compat == 1
+
       let leader = self.get_2ndleader(lnum)
     else
       if fo_2 != -1
@@ -439,6 +444,7 @@ endfunction
 
 function! s:lib.vimformatexpr(lnum, count, ...)
   let lnum = a:lnum
+  let lines = line('$')
   if a:count == 0 || lnum > line('$')
     return 1
   endif
@@ -455,7 +461,7 @@ function! s:lib.vimformatexpr(lnum, count, ...)
   exe 'setlocal textwidth='.saved_tw
   exe 'setlocal formatexpr='.saved_fex
   exe 'setlocal formatoptions='.saved_fo
-  let l = line('.') - lnum + 1
+  let l = line('$') - lines + 1
   return l
 endfunction
 
@@ -467,7 +473,7 @@ function! s:lib.get_2ndleader(lnum)
   let saved_cursor = getpos(".")
   let line = getline(lnum)
   let tw = strlen(line)
-  let test = line . repeat('ﾝ', tw)
+  let test = line . repeat('ﾝ', tw+1)
   call setline(lnum, test)
   let l = self.vimformatexpr(lnum, 1, tw)
   call setline(lnum, line)
@@ -549,6 +555,15 @@ endfunction
 
 function! jpfmt#import()
   return s:lib
+endfunction
+
+function! jpfmt#gqp(...)
+  let saved_cursor = getpos(".")
+  let sreg = '^$\|'.s:lib.get_opt('jpfmt_paragraph_regexp')
+  let l = search(sreg, 'nW')
+  let c = (l != 0 ? l : line('.')) - line('.')
+  silent! exe 'silent! normal! '.c.'gqq'
+  call setpos('.', saved_cursor)
 endfunction
 
 let &cpo = s:cpo_save
