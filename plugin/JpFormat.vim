@@ -1167,12 +1167,15 @@ endfunction
 "=============================================================================
 command! -bang -range JpFormatGq call JpFormatGq(<line1>, <line2>, <bang>0)
 function!  JpFormatGq(fline, lline, mode, ...)
+  call JpFormatGqPre()
+
   let b:jpformat = 1
   let b:jpf_saved_tw=&textwidth
   let b:jpf_saved_fex=&formatexpr
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
+
   let cmode = g:JpFormatCountMode
   let chars = (b:JpCountChars)*cmode
   silent! exec 'setlocal textwidth='.chars
@@ -1204,7 +1207,23 @@ function!  JpFormatGq(fline, lline, mode, ...)
   endif
   silent! exec 'setlocal formatexpr='.b:jpf_saved_fex
   silent! exec 'setlocal textwidth='.b:jpf_saved_tw
+  call JpFormatGqPost()
 endfunction
+
+if !exists('g:jpfmt_paragraph_regexp')
+  let g:jpfmt_paragraph_regexp = '^[　「]'
+endif
+if !exists('*JpFormatGqPre')
+function! JpFormatGqPre(...)
+  let s:jpfmt_paragraph_regexp = g:jpfmt_paragraph_regexp
+  let g:jpfmt_paragraph_regexp = '^$'
+endfunction
+endif
+if !exists('*JpFormatGqPost')
+function! JpFormatGqPost(...)
+  let g:jpfmt_paragraph_regexp = s:jpfmt_paragraph_regexp
+endfunction
+endif
 
 function! s:JpFormatGqExec(mode, lines, lnum, col)
   let mode  = a:mode
