@@ -99,49 +99,61 @@ if !exists('JpFormat_iformatexpr')
   let g:JpFormat_iformatexpr = ''
 endif
 
+function! JpFormatKinsokuReg(str)
+  let str = a:str
+  if str =~ '^\[.*\]$'
+    return str
+  endif
+  return '['.escape(str, ']').']'
+endfunction
+
 " 基本的な処理方法
 " 1. まず指定文字数に行を分割
 " 2. 次行の行頭禁則文字を現在行へ移動
 " 3. 現在行の行末禁則文字を次行へ移動
 " 4. ぶら下がり文字数を超えてぶら下がっていたら追い出し
-"
+
 " 行頭禁則
 if !exists('JpKinsoku')
-  let JpKinsoku = '-!?}>－ｰ～！？゛゜ゝゞ）］｡｣､･ﾞﾟヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々‐・:;.°￠′″‰℃、。，．,)\]｝〕〉》」』】〟’”≫―…‥'
+  let JpKinsoku = '-}>）―～－ｰ］！？゛゜ゝゞ｡｣､･ﾞﾟ'.',)\]｝、〕〉》」』】〟’”'.'ヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々'.'‐'.'?!'.'・:;'.'。.'.'…‥'.'°′″‰℃'
   if &enc == 'utf-8'
-    let JpKinsoku .= 'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ〻゠–〜¢ℓ㏋‼⁇⁈⁉〙〗｠»—〳〴〵'
+    let JpKinsoku .= '〙〗｠»'.'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'.'〻'.'〜'.'‼⁇⁈⁉'.'゠'.'–'.'—〳〴〵'.'¢ℓ㏋'
   endif
   let JpKinsoku = '['.JpKinsoku.']'
 endif
+
 " 行末禁則
 if !exists('JpKinsokuE')
-  let JpKinsokuE = '-_0-9a-zA-Z([{<（｛〔〈《「『【〝‘“'
+  let JpKinsokuE = '-_0-9a-zA-Z{<（［'.'([｛〔〈《「『【〝‘“'.'¥£$＃№'
   if &enc == 'utf-8'
-    let JpKinsokuE .= '〘〖｟«'
+    let JpKinsokuE .= '〘〖｟«'.'€'
   endif
   let JpKinsokuE = '['.JpKinsokuE.']'
 endif
+
 " 句点と閉じ括弧
 if !exists('JpKutenParen')
-  let JpKutenParen = '、。，．,)\]｝〕〉》」』】〟’”'
+  let JpKutenParen = '、。，．'.',)\]｝、〕〉》」』】〟’”'
   if &enc == 'utf-8'
     let JpKutenParen .= '〙〗｠»'
   endif
   let JpKutenParen = '['.JpKutenParen.']'
 endif
+
 " 句点と閉じ括弧＋分離不可文字追い出し用
 " 分離不可文字を追い出す時にJpNoDivNがあったら、そこから追い出し。
 " ですか？――<分割> のような行があったら ？は残して――のみを追い出す。
 if !exists('JpNoDivN')
-  let JpNoDivN = '、。，．,)\]｝〕〉》」』】〟’”!?！？'
+  let JpNoDivN = '、。，．'.')\]｝、〕〉》」』】〟’”'.'!?！？'
   if &enc == 'utf-8'
-    let JpNoDivN .= '〙〗｠»‼⁇⁈⁉'
+    let JpNoDivN .= '〙〗｠»'.'‼⁇⁈⁉'
   endif
   let JpNoDivN = '['.JpNoDivN.']'
 endif
+
 " 分離不可
 if !exists('JpNoDiv')
-  let JpNoDiv = '―…‥'
+  let JpNoDiv = '―'.'…‥'
   if &enc == 'utf-8'
     let JpNoDiv .= '—'
   endif
@@ -155,15 +167,16 @@ if !exists('JpNoDivPair')
   endif
   let JpNoDivPair = '['.JpNoDivPair.']'
 endif
+
 " 追い出し用
 " ぶら下がり文字数を超えている時、JpKinsokuO以外の1文字を足して追い出す。
 " 未設定時にはJpKinsokuで代用される。
 if !exists('JpKinsokuO')
-  " let JpKinsokuO = '-!?}>－ｰ～！？゛゜ゝゞ）］｡｣､･ﾞﾟヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々‐・:;.°￠′″‰℃、。，．,)\]｝〕〉》」』】〟’”≫―…‥'
+  " let JpKinsokuO = '-}>）―～－ｰ］！？゛゜ゝゞ｡｣､･ﾞﾟ'.',)\]｝、〕〉》」』】〟’”' . 'ヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々'.'‐'.'?!'.'・:;'.'。.'.'…‥'.'°′″‰℃'
   " if &enc == 'utf-8'
-  "   let JpKinsokuO .= 'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ〻゠–〜¢ℓ㏋‼⁇⁈⁉〙〗｠»—〳〴〵'
+  "   let JpKinsokuO .= '〙〗｠»'.'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'.'〻'.'〜'.'‼⁇⁈⁉'.'゠'.'–'.'—〳〴〵'.'¢ℓ㏋'
   " endif
-  " let JpKinsokuO = '['.JpKinsokuO.']'
+  " let JpKinsokuO = '['.JpKinsokuO']'
 endif
 
 " 整形対象外行の正規表現
