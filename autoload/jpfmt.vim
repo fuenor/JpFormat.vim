@@ -368,7 +368,7 @@ function! s:lib.format_lines(lnum, count)
     let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
   endif
   let lines = getline(lnum, lnum + a:count - 1)
-  let tw = strlen(join(lines))
+  let tw = strdisplaywidth(join(lines))
   let l = self.vimformatexpr(lnum, a:count, tw)
   let tw = self.textwidth
   if jpfmt_compat == 0
@@ -382,7 +382,7 @@ function! s:lib.format_lines(lnum, count)
       let l = self.vimformatexpr(lnum, 1, tw)
       break
     endif
-    if compat != 3 && strlen(self.retab(matchstr(line, '^\s*[^[:space:]]'))) < self.textwidth-1
+    if compat != 3 && strdisplaywidth(matchstr(line, '^\s*[^[:space:]]')) < self.textwidth-1
       let s:JpFormatCountMode = g:JpFormatCountMode
       let g:JpFormatCountMode = 1
       let s:JpCountChars      = exists('b:JpCountChars') ? b:JpCountChars : g:JpCountChars
@@ -426,7 +426,6 @@ function! s:lib.format_lines(lnum, count)
       call setline(lnum, line1)
     endif
     if jpfmt_compat == 1
-
       let leader = self.get_2ndleader(lnum)
     else
       if fo_2 != -1
@@ -472,7 +471,7 @@ function! s:lib.get_2ndleader(lnum)
   endif
   let saved_cursor = getpos(".")
   let line = getline(lnum)
-  let tw = strlen(line)
+  let tw = strdisplaywidth(line)
   let test = line . repeat('ﾝ', tw+1)
   call setline(lnum, test)
   let l = self.vimformatexpr(lnum, 1, tw)
