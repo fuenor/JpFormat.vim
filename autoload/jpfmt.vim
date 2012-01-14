@@ -390,7 +390,7 @@ function! s:lib.format_lines(lnum, count)
       if !exists('b:JpCountOverChars')
         let b:JpCountOverChars = g:JpCountOverChars
       endif
-      let [glist, addmarker]  = JpFormatStr([line], 0, 'gq')
+      let [glist, addmarker]  = JpFormatStr([line], 0, '')
       let g:JpFormatCountMode = s:JpFormatCountMode
       let b:JpCountChars      = s:JpCountChars
       if len(glist) <= 1
@@ -472,13 +472,13 @@ function! s:lib.get_2ndleader(lnum)
   let saved_cursor = getpos(".")
   let line = getline(lnum)
   let tw = strdisplaywidth(line)
-  let test = line . repeat('ﾝ', tw+1)
+  let test = line . repeat('あ', tw+1)
   call setline(lnum, test)
   let l = self.vimformatexpr(lnum, 1, tw)
   call setline(lnum, line)
   let leader2 = ''
   if l > 1
-    let leader2 = substitute(getline(lnum+1), 'ﾝ\+$', '', '')
+    let leader2 = substitute(getline(lnum+1), 'あ\+$', '', '')
     silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
   endif
   call setpos('.', saved_cursor)

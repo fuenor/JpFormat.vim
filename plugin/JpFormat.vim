@@ -31,10 +31,6 @@ endif
 if !exists('JpCountChars')
   let JpCountChars = 40
 endif
-" 半角一文字分オーバーしても折り返し処理をする/しない
-if !exists('JpFormatHankakuOver')
-  let JpFormatHankakuOver = 0
-endif
 " 折り返し文字数(b:JpCountChars)の値はtextwidthから設定する。
 " 有効な場合 g:JpCountCharsは無視される
 if !exists('JpCountChars_Use_textwidth')
@@ -124,7 +120,7 @@ endif
 
 " 行末禁則
 if !exists('JpKinsokuE')
-  let JpKinsokuE = '-_0-9a-zA-Z{<（［'.'([｛〔〈《「『【〝‘“'.'¥£$＃№'
+  let JpKinsokuE = '-_0-9a-zA-Z{<（［'.'([｛〔〈《「『【〝‘“'.'\¥£$＃№'
   if &enc == 'utf-8'
     let JpKinsokuE .= '〘〖｟«'.'€'
   endif
@@ -870,8 +866,6 @@ function! JpFormatStr(str, clidx, ...)
   let JpNoDivL = '^'.g:JpNoDiv.'\+'
   let JpNoDivN = g:JpNoDivN.g:JpNoDiv.'\{2}$'
   let cmode = g:JpFormatCountMode
-  " let hankakuover = g:JpFormatHankakuOver*(cmode-1)
-  " let chars  = (b:JpCountChars)*cmode-hankakuover
   let chars  = (b:JpCountChars)*cmode
   let ochars = (b:JpCountOverChars)*cmode
   let catmarker = a:0 ? '' : g:JpFormatMarker
@@ -889,8 +883,10 @@ function! JpFormatStr(str, clidx, ...)
       call add(fstr, lstr)
       continue
     endif
-    let leader  = a:0 ? '' : matchstr(lstr, '^\s*')
-    let sleader = a:0 ? '' : leader
+    " let leader  = a:0 ? '' : matchstr(lstr, '^\s*')
+    " let sleader = a:0 ? '' : leader
+    let leader  = a:0 ? a:1 : matchstr(lstr, '^\s*')
+    let sleader = a:0 ? a:1 : leader
     if g:JpFormatIndent == 0
       let leader = ''
       let sleader = ''
@@ -908,10 +904,9 @@ function! JpFormatStr(str, clidx, ...)
           let chars = 1
         endif
       endif
-      let str = substitute(lstr, '\%>'.chars.'v.*','','')
-      if !g:JpFormatHankakuOver && str != '[[:print:]]$'
-        let str = substitute(lstr, '\%>'.(chars-1).'v.*','','')
-      endif
+
+      let lchars = chars - (strdisplaywidth(matchstr(lstr, '\%'.chars.'v.')) > 1)
+      let str = substitute(lstr, '\%>'.lchars.'v.*','','')
       let lstr = strpart(lstr, strlen(str))
       if lstr == ''
         let addcr += addline
@@ -989,7 +984,8 @@ function! JpFormatStr(str, clidx, ...)
 
       " ぶら下がり文字数を超えている時、JpKinsokuO以外の1文字を足して追い出す。
       if outstr && ochars >= 0
-        if substitute(str, '\%>'.(chars+ochars).'v.*','','') != str
+        let lchars = chars - (strdisplaywidth(matchstr(str, '\%'.chars.'v.')) > 1)
+        if substitute(str, '\%>'.(lchars+ochars).'v.*','','') != str
           let ostr = matchstr(str, JpKinsokuO)
           let str = strpart(str, 0, strlen(str)-strlen(ostr))
           let ostr = matchstr(str, '.\{1}$').ostr
@@ -1005,6 +1001,7 @@ function! JpFormatStr(str, clidx, ...)
       endif
       " ---------- ここまでが禁則処理のメインループ ----------
       if str == ''
+        let lchars = chars - (strdisplaywidth(matchstr(lstr, '\%'.chars.'v.')) > 1)
         let str = substitute(lstr, '\%>'.chars.'v.*','','')
         let lstr = strpart(lstr, strlen(str))
       endif

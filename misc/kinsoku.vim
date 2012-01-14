@@ -43,7 +43,7 @@ let JpKinsoku = '['.JpKinsoku.']'
 " 行末禁則
 let JpKinsokuE = '-_0-9a-zA-Z{<（［'
              \ . '([｛〔〈《「『【〝‘“'
-             \ . '¥£$＃№'
+             \ . '¥\£$＃№'
 if &enc == 'utf-8'
   let JpKinsokuE .= '〘〖｟«'
                 \ . '€'
