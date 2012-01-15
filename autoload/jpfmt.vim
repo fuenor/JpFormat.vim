@@ -9,10 +9,9 @@
 "               formatexprを設定すると通常のgqコマンドとして使用できます。
 "                 set formatexpr=jpfmt#formatexpr()
 "
-"               以下をVimの設定ファイルへ追加するとgqとJpFormat.vimで整形処理
-"               に使用されます。
-"                 set formatexpr=jpfmt#formatexpr()
-"                 let JpFormatGqMode      = 1
+"               設定にかかわらず「ぶら下げ」処理を行いたくない場合は
+"               jpvim#formatexpr()を使用します。
+"                 set formatexpr=jpvim#formatexpr()
 "
 "               JpFormatでのみ使用する場合はJpFormat_formatexprを設定します。
 "                 let JpFormatGqMode      = 1
@@ -368,7 +367,7 @@ function! s:lib.format_lines(lnum, count)
     let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
   endif
   let lines = getline(lnum, lnum + a:count - 1)
-  let tw = strdisplaywidth(join(lines))
+  let tw = strdisplaywidth(join(lines), '')
   let l = self.vimformatexpr(lnum, a:count, tw)
   let tw = self.textwidth
   if jpfmt_compat == 0
@@ -382,7 +381,8 @@ function! s:lib.format_lines(lnum, count)
       let l = self.vimformatexpr(lnum, 1, tw)
       break
     endif
-    if compat != 3 && strdisplaywidth(matchstr(line, '^\s*[^[:space:]]')) < self.textwidth-1
+    if compat != 3 " && strdisplaywidth(matchstr(line, '^\s*[^[:space:]]')) < self.textwidth-1
+      let leader2 = self.get_2ndleader(lnum)
       let s:JpFormatCountMode = g:JpFormatCountMode
       let g:JpFormatCountMode = 1
       let s:JpCountChars      = exists('b:JpCountChars') ? b:JpCountChars : g:JpCountChars
@@ -390,20 +390,40 @@ function! s:lib.format_lines(lnum, count)
       if !exists('b:JpCountOverChars')
         let b:JpCountOverChars = g:JpCountOverChars
       endif
-      let [glist, addmarker]  = JpFormatStr([line], 0, '')
+      let [glist, addmarker]  = JpFormatStr([line], 0, '', leader2)
       let g:JpFormatCountMode = s:JpFormatCountMode
       let b:JpCountChars      = s:JpCountChars
       if len(glist) <= 1
         break
       endif
-      let line1 = glist[0]
-      let col = strlen(line1)
-      let line2 = strpart(line, col)
-      let line2 = substitute(line2, '^\s*', '', '')
-      " 分割位置が日本語の時だけJpFormatの整形を使用
-      if line1 =~ '[^[:print:]]$' || line2 =~ '^[^[:print:]]'
-        call setline(lnum, line1)
-        let compat = 0
+      let idx = 0
+      let llen = strlen(leader2)
+      for i in range(len(glist)-1)
+        let line1 = glist[i]
+        let line2 = glist[i+1]
+        let line2 = substitute(line2[llen :], '^\s*', '', '')
+        " 分割位置が日本語の行までJpFormatの整形を使用
+        if line1 =~ '[^[:print:]]$' || line2 =~ '^[^[:print:]]'
+          let idx += 1
+        else
+          break
+        endif
+      endfor
+      if idx == 0
+      elseif idx == len(glist)-1
+        call append(lnum, glist)
+        silent! execute printf('silent %ddelete _ %d', lnum, 1)
+        break
+      else
+        let col = strlen(join(glist[: idx-1], ''))-llen*(idx-1)
+        let line2 = strpart(line, col)
+        let line2 = substitute(line2, '^\s*', '', '')
+        call append(lnum, leader2.line2)
+        call append(lnum, glist[: idx-1])
+        silent! execute printf('silent %ddelete _ %d', lnum, 1)
+        let lnum += idx
+        let fo_2 = -1
+        continue
       endif
     endif
     if compat == 1
@@ -426,7 +446,7 @@ function! s:lib.format_lines(lnum, count)
       call setline(lnum, line1)
     endif
     if jpfmt_compat == 1
-      let leader = self.get_2ndleader(lnum)
+      let leader = leader2
     else
       if fo_2 != -1
         let leader = fo_2
@@ -498,8 +518,8 @@ function! s:lib.get_vim_paragraph(fline, lline)
   let pleader = self.get_2ndleader(fline)
   let pleader = pleader =~ '^\s\+$' ? ' ' : substitute(pleader, '^\s*\|\s*$', '', 'g')
   for idx in range(0, lline-fline)
-    if glist[idx] == ''
-      if glist[idx-1] != '' && start <= idx-1
+    if glist[idx] =~ '^\s*$'
+      if glist[idx-1] !~ '^\s*$' && start <= idx-1
         call add(res, [start, glist[start : idx-1]])
       endif
       let start = idx+1
@@ -511,7 +531,8 @@ function! s:lib.get_vim_paragraph(fline, lline)
     let cleader = cleader =~ '^\s\+$' ? ' ' : substitute(cleader, '^\s*\|\s*$', '', 'g')
     let write = 0
 
-    """""" のように2nd leaderが '' だがコメント行の場合
+    """""" のように2nd leaderが '' でコメント行の場合
+    " gqはコメント記号のみの行を整形しない
     if cleader == '' && pleader =~ '[^[:space:]]'
       if glist[idx] =~ '^\s*\V'.escape(pleader, '\\')
         let cleader = 'パパラパー'
@@ -566,4 +587,10 @@ function! jpfmt#gqp(...)
 endfunction
 
 let &cpo = s:cpo_save
+finish
+
+function! s:lib.is_comment(line)
+  let leader = self.get_2ndleader(line('.'))
+  return leader =~ '[[:graph:]]'
+endfunction
 

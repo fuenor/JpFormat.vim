@@ -590,14 +590,14 @@ function! JpFormatAll(fline, lline, mode, ...)
     let cfline = fline
   endif
   if fline <= cline && lline >= cline
-    let cstr = join(getline(cfline, cline-1)).strpart(getline(cline), 0, ccol-1)
+    let cstr = join(getline(cfline, cline-1), '').strpart(getline(cline), 0, ccol-1)
     let cstr = substitute(cstr, '\s\+', '', 'g').matchstr(cstr, '\s\+$')
   endif
   let [glist, cmarker] = JpFormatStr(glist, clidx)
   if fline <= cline && lline >= cline
     let elen = s:InsertPointgq(glist[cmarker :], cstr)
   elseif lline < cline
-    let elen += strlen(join(glist)) - strlen(join(getline(fline, lline)))
+    let elen += strlen(join(glist, '')) - strlen(join(getline(fline, lline), ''))
   endif
   let g:JpFormatMarker = marker
 
@@ -741,7 +741,7 @@ function! JpFormatExec(fline, lline)
   let lline = fline + lines - 1
 
   let b:jpformat = g:JpAutoFormat
-  let cstr = strpart(join(glist), 0, clidx)
+  let cstr = strpart(join(glist, ''), 0, clidx)
   let cstr = substitute(cstr, '\s\+', '', 'g').matchstr(cstr, '\s\+$')
   let [glist, cline] = JpFormatStr(glist, cline)
   let elen = s:InsertPointgq(glist, cstr) + line2byte(fline)
@@ -883,10 +883,13 @@ function! JpFormatStr(str, clidx, ...)
       call add(fstr, lstr)
       continue
     endif
-    " let leader  = a:0 ? '' : matchstr(lstr, '^\s*')
-    " let sleader = a:0 ? '' : leader
-    let leader  = a:0 ? a:1 : matchstr(lstr, '^\s*')
-    let sleader = a:0 ? a:1 : leader
+    if a:0
+      let leader  = a:1 != '' ? a:1 : matchstr(lstr, '^\s*')
+      let sleader = a:0 > 1 ? a:2 : leader
+    else
+      let leader  = matchstr(lstr, '^\s*')
+      let sleader = leader
+    endif
     if g:JpFormatIndent == 0
       let leader = ''
       let sleader = ''
@@ -898,19 +901,21 @@ function! JpFormatStr(str, clidx, ...)
     while 1
       let chars = defchars
       if leader != ''
-        let col = strlen(leader)
+        let col = strdisplaywidth(leader)
         let chars -= col
         if chars < 1
           let chars = 1
         endif
       endif
 
-      let lchars = chars - (strdisplaywidth(matchstr(lstr, '\%'.chars.'v.')) > 1)
-      let str = substitute(lstr, '\%>'.lchars.'v.*','','')
+      let str = s:getdwstr(lstr, chars, leader)
       let lstr = strpart(lstr, strlen(str))
       if lstr == ''
         let addcr += addline
-        call add(fstr, leader.str)
+        if str != ''
+          let str = leader.str
+        endif
+        call add(fstr, str)
         break
       endif
       " strの行末禁則文字を全て次行へ移動
@@ -922,6 +927,7 @@ function! JpFormatStr(str, clidx, ...)
           let str = str . catmarker
           let addcr += addline
           call add(fstr, leader.str)
+          let leader = sleader
           continue
         endif
       endif
@@ -984,25 +990,28 @@ function! JpFormatStr(str, clidx, ...)
 
       " ぶら下がり文字数を超えている時、JpKinsokuO以外の1文字を足して追い出す。
       if outstr && ochars >= 0
-        let lchars = chars - (strdisplaywidth(matchstr(str, '\%'.chars.'v.')) > 1)
-        if substitute(str, '\%>'.(lchars+ochars).'v.*','','') != str
-          let ostr = matchstr(str, JpKinsokuO)
+        " let ofs = strdisplaywidth(matchstr(str, '\%'.(chars+ochars).'v.')) > 1
+        let ofs = 0
+        if strdisplaywidth(str) > chars+ochars+ofs
+          let ostr = matchstr(str, '.'.g:JpKinsoku.'*'.JpKinsokuO)
+          if ostr =~ '^[[:print]]'
+            let ostr = matchstr(ostr, '^.\zs.*')
+          endif
           let str = strpart(str, 0, strlen(str)-strlen(ostr))
-          let ostr = matchstr(str, '.\{1}$').ostr
-          let str = strpart(str, 0, strlen(str)-strlen(matchstr(str, '.\{1}$')))
           let lstr = ostr.lstr
+
           " 行末禁則文字を全て次行へ移動
-          if str =~ JpKinsokuE
+          if str !~ '[[:print:]]$' && str =~ JpKinsokuE
             let ostr = matchstr(str, JpKinsokuE)
             let str = strpart(str, 0, strlen(str)-strlen(ostr))
             let lstr = ostr.lstr
           endif
         endif
       endif
+
       " ---------- ここまでが禁則処理のメインループ ----------
       if str == ''
-        let lchars = chars - (strdisplaywidth(matchstr(lstr, '\%'.chars.'v.')) > 1)
-        let str = substitute(lstr, '\%>'.chars.'v.*','','')
+        let str = s:getdwstr(lstr, chars, leader)
         let lstr = strpart(lstr, strlen(str))
       endif
       if lstr != ''
@@ -1010,13 +1019,41 @@ function! JpFormatStr(str, clidx, ...)
       endif
       let addcr += addline
       call add(fstr, leader.str)
+      let leader = sleader
       if strlen(lstr) == ''
         break
       endif
-      let leader = sleader
     endwhile
   endfor
   return [fstr, addcr]
+endfunction
+
+function! s:getdwstr(lstr, chars, leader)
+  let leader = a:leader
+  let llen = strlen(leader)
+  let chars = strdisplaywidth(leader)+a:chars
+  let lstr = leader.a:lstr
+  let str = substitute(lstr, '\%>'.chars.'v.*','','')
+
+  if strdisplaywidth(str) == chars
+    return str[llen :]
+  endif
+  if strlen(str) < strlen(lstr)
+    for n in range(strlen(str), strlen(lstr)-1)
+      if strdisplaywidth(str) >= chars
+        break
+      endif
+      let str .= matchstr(lstr, '\%'.(strdisplaywidth(str)+1).'v.')
+    endfor
+  endif
+  if strdisplaywidth(str) > chars
+    let str = substitute(str, '.$', '', '')
+  endif
+  let str = str[llen :]
+  if str =~ '^\s*$'
+    let str = matchstr(lstr, '[^[:space:]]')
+  endif
+  return str
 endfunction
 
 " 挿入モード後に自動整形
@@ -1274,7 +1311,7 @@ function! s:JpFormatGqExec(mode, lines, lnum, col)
     let cpoint = 1
     let glist = getline(fline, lnum)
     let glist[-1] = strpart(glist[-1], 0, col-1)
-    let cstr = join(glist)
+    let cstr = join(glist, '')
     let cstr = substitute(cstr, '\s\+', '', 'g').matchstr(cstr, '\s\+$')
   endif
 
