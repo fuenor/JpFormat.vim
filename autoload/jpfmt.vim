@@ -34,7 +34,26 @@
 let s:cpo_save = &cpo
 set cpo&vim
 
-" === compat.vim
+function! jpfmt#formatexpr()
+  return s:lib.formatexpr()
+endfunction
+
+function! jpfmt#gqp(...)
+  let saved_cursor = getpos(".")
+  let sreg = '^$\|'.s:lib.get_opt('jpfmt_paragraph_regexp')
+  let l = search(sreg, 'nW')
+  let c = (l != 0 ? l : line('.')) - line('.')
+  silent! exe 'silent! normal! '.c.'gqq'
+  call setpos('.', saved_cursor)
+endfunction
+
+function! jpfmt#import()
+  return s:lib
+endfunction
+
+let s:lib = {}
+
+" === from compat.vim
 
 if exists('*strdisplaywidth')
   let s:strdisplaywidth = function('strdisplaywidth')
@@ -58,8 +77,6 @@ else
     return w
   endfunction
 endif
-
-let s:lib = {}
 
 function s:lib.format_insert_mode(char)
   " @warning char can be "" when completion is used
@@ -106,104 +123,6 @@ function s:lib.has_format_options(x)
     return 0
   endif
   return stridx(&formatoptions, a:x) != -1
-endfunction
-
-function s:lib.is_comment(line)
-  let com_str = self.parse_leader(a:line)[1]
-  return com_str != ""
-endfunction
-
-function s:lib.parse_leader(line)
-  "  +-------- indent
-  "  | +------ com_str
-  "  | | +---- mindent
-  "  | | |   + text
-  "  v v v   v
-  " |  /*    xxx|
-  "
-  " @return [indent, com_str, mindent, text, com_flags]
-
-  if a:line =~# '^\s*$'
-    return [a:line, "", "", "", ""]
-  endif
-  let middle = []
-  for [flags, str] in self.parse_opt_comments(&comments)
-    let mx = printf('\v^(\s*)(\V%s\v)(\s%s|$)(.*)$', escape(str, '\'),
-          \ (flags =~# 'b') ? '+' : '*')
-    " If we found a middle match previously, use that match when this is
-    " not a middle or end. */
-    if !empty(middle) && flags !~# '[me]'
-      break
-    endif
-    if a:line =~# mx
-      let res = matchlist(a:line, mx)[1:4] + [flags]
-      " We have found a match, stop searching unless this is a middle
-      " comment. The middle comment can be a substring of the end
-      " comment in which case it's better to return the length of the
-      " end comment and its flags.  Thus we keep searching with middle
-      " and end matches and use an end match if it matches better.
-      if flags =~# 'm'
-        let middle = res
-        continue
-      elseif flags =~# 'e'
-        if !empty(middle) && strchars(res[1]) <= strchars(middle[1])
-          let res = middle
-        endif
-      elseif flags =~# 'n'
-        " nested comment
-        while 1
-          let [indent, com_str, mindent, text, com_flags] = self.parse_leader(res[3])
-          if com_flags !~# 'n'
-            break
-          endif
-          let res = [res[0], res[1] . res[2] . com_str, mindent, text, res[4]]
-        endwhile
-      endif
-      return res
-    endif
-  endfor
-  if !empty(middle)
-    return middle
-  endif
-  return matchlist(a:line, '\v^(\s*)()()(.*)$')[1:4] + [""]
-endfunction
-
-function s:lib.parse_opt_comments(comments)
-  " @param  comments  'comments' option
-  " @return           [[flags, str], ...]
-
-  let res = []
-  for com in split(a:comments, '[^\\]\zs,')
-    let [flags; _] = split(com, ':', 1)
-    " str can contain ':' and ','
-    let str = join(_, ':')
-    let str = substitute(str, '\\,', ',', 'g')
-    call add(res, [flags, str])
-  endfor
-  return res
-endfunction
-
-function s:lib.retab(line, ...)
-  let col = get(a:000, 0, 0)
-  let expandtab = get(a:000, 1, &expandtab)
-  let tabstop = get(a:000, 2, &tabstop)
-  let s2 = matchstr(a:line, '^\s*', col)
-  if s2 == ''
-    return a:line
-  endif
-  let s1 = strpart(a:line, 0, col)
-  let t = strpart(a:line, col + len(s2))
-  let n1 = s:strdisplaywidth(s1)
-  let n2 = s:strdisplaywidth(s2, n1)
-  if expandtab
-    let s2 = repeat(' ', n2)
-  else
-    if n1 != 0 && n2 >= (tabstop - (n1 % tabstop))
-      let n2 += n1 % tabstop
-    endif
-    let s2 = repeat("\t", n2 / tabstop) . repeat(' ', n2 % tabstop)
-  endif
-  return s1 . s2 . t
 endfunction
 
 function s:lib.get_opt(name)
@@ -264,7 +183,6 @@ endfunction
 
 " FIXME: How to detect command-line window?
 function s:lib.is_cmdwin()
-
   " workaround1
   "return bufname('%') == '[Command Line]'
 
@@ -284,7 +202,6 @@ function s:lib.is_cmdwin()
     let &debug = debug_save
   endtry
   return 0
-
 endfunction
 
 " FIXME: This may break another :redir session?
@@ -345,8 +262,8 @@ function! s:lib.jpformat_normal_mode(lnum, count)
   let para = self.get_vim_paragraph(a:lnum, a:lnum + a:count - 1)
   for [i, lines] in para
     let lnum = a:lnum + i + offset
-    " call setline(lnum, self.retab(getline(lnum)))
-    let offset += self.format_lines(lnum, len(lines))
+    " let offset += self.format_lines(lnum, len(lines))
+    let offset += self.format_lines(lnum, lines)
   endfor
 
   " The cursor is left on the first non-blank of the last formatted line.
@@ -381,7 +298,7 @@ function! s:lib.format_lines(lnum, count)
       let l = self.vimformatexpr(lnum, 1, tw)
       break
     endif
-    if compat != 3 " && strdisplaywidth(matchstr(line, '^\s*[^[:space:]]')) < self.textwidth-1
+    if compat != 3
       let leader2 = self.get_2ndleader(lnum)
       let s:JpFormatCountMode = g:JpFormatCountMode
       let g:JpFormatCountMode = 1
@@ -461,6 +378,11 @@ function! s:lib.format_lines(lnum, count)
   return line('$') - prev_lines
 endfunction
 
+function! s:lib.is_comment(line)
+  let leader = self.get_2ndleader(line('.'))
+  return leader =~ '[[:graph:]]'
+endfunction
+
 function! s:lib.vimformatexpr(lnum, count, ...)
   let lnum = a:lnum
   let lines = line('$')
@@ -517,10 +439,11 @@ function! s:lib.get_vim_paragraph(fline, lline)
   let start = 0
   let pleader = self.get_2ndleader(fline)
   let pleader = pleader =~ '^\s\+$' ? ' ' : substitute(pleader, '^\s*\|\s*$', '', 'g')
-  for idx in range(0, lline-fline)
+  for idx in range(0, len(glist)-1)
     if glist[idx] =~ '^\s*$'
       if glist[idx-1] !~ '^\s*$' && start <= idx-1
-        call add(res, [start, glist[start : idx-1]])
+        " call add(res, [start, glist[start : idx-1]])
+        call add(res, [start, idx - start])
       endif
       let start = idx+1
       let pleader = ''
@@ -557,40 +480,19 @@ function! s:lib.get_vim_paragraph(fline, lline)
 
     if write
       if start <= idx-1
-        call add(res, [start, glist[start : idx-1]])
+        " call add(res, [start, glist[start : idx-1]])
+        call add(res, [start, idx - start])
       endif
       let start = idx
     endif
     let pleader = cleader
   endfor
   if glist[-1] != ''
-    call add(res, [start, glist[start : -1]])
+    " call add(res, [start, glist[start : -1]])
+    call add(res, [start, len(glist)-start])
   endif
   return res
 endfunction
 
-function! jpfmt#formatexpr()
-  return s:lib.formatexpr()
-endfunction
-
-function! jpfmt#import()
-  return s:lib
-endfunction
-
-function! jpfmt#gqp(...)
-  let saved_cursor = getpos(".")
-  let sreg = '^$\|'.s:lib.get_opt('jpfmt_paragraph_regexp')
-  let l = search(sreg, 'nW')
-  let c = (l != 0 ? l : line('.')) - line('.')
-  silent! exe 'silent! normal! '.c.'gqq'
-  call setpos('.', saved_cursor)
-endfunction
-
 let &cpo = s:cpo_save
-finish
-
-function! s:lib.is_comment(line)
-  let leader = self.get_2ndleader(line('.'))
-  return leader =~ '[[:graph:]]'
-endfunction
 

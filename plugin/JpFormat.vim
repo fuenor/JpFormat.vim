@@ -4,7 +4,7 @@
 "                 http://sites.google.com/site/fudist/Home/jpformat
 "=============================================================================
 scriptencoding utf-8
-let s:Version = 1.19
+let s:Version = 1.20
 
 if exists('disable_JpFormat') && disable_JpFormat
   finish
@@ -854,16 +854,10 @@ function! JpFormatStr(str, clidx, ...)
   let clidx = a:clidx
   let fstr = []
   let idx = 0
-  let JpKinsoku  = '^'.g:JpKinsoku.'\+'
-  let JpKinsokuO = g:JpKinsoku.'\+$'
+  let JpKinsokuO = g:JpKinsoku
   if exists('g:JpKinsokuO')
-    let JpKinsokuO = g:JpKinsokuO.'\+$'
+    let JpKinsokuO = g:JpKinsokuO
   endif
-  let JpKinsokuS = g:JpKinsoku.'\+$'
-  let JpKinsokuE = g:JpKinsokuE.'\+$'
-  let JpNoDiv = g:JpNoDiv.'\+$'
-  let JpNoDivPair = g:JpNoDivPair.'\+$'
-  let JpNoDivL = '^'.g:JpNoDiv.'\+'
   let JpNoDivN = g:JpNoDivN.g:JpNoDiv.'\{2}$'
   let cmode = g:JpFormatCountMode
   let chars  = (b:JpCountChars)*cmode
@@ -919,8 +913,8 @@ function! JpFormatStr(str, clidx, ...)
         break
       endif
       " strの行末禁則文字を全て次行へ移動
-      if str =~ JpKinsokuE
-        let ostr = matchstr(str, JpKinsokuE)
+      if str =~ g:JpKinsokuE.'\+$'
+        let ostr = matchstr(str, g:JpKinsokuE.'\+$')
         let str = strpart(str, 0, strlen(str)-strlen(ostr))
         let lstr = ostr.lstr
         if str != ''
@@ -933,8 +927,8 @@ function! JpFormatStr(str, clidx, ...)
       endif
 
       " lstrの行頭禁則文字を全て現在行へ移動
-      if lstr =~ JpKinsoku
-        let ostr = matchstr(str, '.\{1}$').matchstr(lstr, JpKinsoku)
+      if lstr =~ '^'.g:JpKinsoku
+        let ostr = matchstr(str, '.\{1}$').matchstr(lstr, '^'.g:JpKinsoku.'\+')
         " 句点関係があったらそこまで
         if ostr =~ g:JpKutenParen
           let ostr = strpart(ostr, 0, matchend(ostr, g:JpKutenParen.'\+'))
@@ -959,7 +953,7 @@ function! JpFormatStr(str, clidx, ...)
       " 分離不可文字は境界で2文字単位で追い出し
       if ochars > 0
         let div = 0
-        if g:JpNoDiv != '' && str =~ JpNoDiv
+        if g:JpNoDiv != '' && str =~ g:JpNoDiv.'$'
           let dchar = matchstr(str, '.$')
           if lstr =~ '^'.dchar && strlen(substitute(matchstr(str, dchar.'\+$'), '.', '.', 'g')) % 2
             let str .= dchar
@@ -975,8 +969,8 @@ function! JpFormatStr(str, clidx, ...)
         endif
         if div
           " lstrの行頭禁則文字を全て現在行へ移動
-          if lstr =~ JpKinsoku
-            let ostr = matchstr(str, '.\{1}$').matchstr(lstr, JpKinsoku)
+          if lstr =~ '^'.g:JpKinsoku
+            let ostr = matchstr(str, '.\{1}$').matchstr(lstr, '^'.g:JpKinsoku.'\+')
             " 句点関係があったらそこまで
             if ostr =~ g:JpKutenParen
               let ostr = strpart(ostr, 0, matchend(ostr, g:JpKutenParen.'\+'))
@@ -993,7 +987,7 @@ function! JpFormatStr(str, clidx, ...)
         " let ofs = strdisplaywidth(matchstr(str, '\%'.(chars+ochars).'v.')) > 1
         let ofs = 0
         if strdisplaywidth(str) > chars+ochars+ofs
-          let ostr = matchstr(str, '.'.g:JpKinsoku.'*'.JpKinsokuO)
+          let ostr = matchstr(str, '.'.g:JpKinsoku.'*'.JpKinsokuO.'\+$')
           if ostr =~ '^[[:print]]'
             let ostr = matchstr(ostr, '^.\zs.*')
           endif
@@ -1001,8 +995,8 @@ function! JpFormatStr(str, clidx, ...)
           let lstr = ostr.lstr
 
           " 行末禁則文字を全て次行へ移動
-          if str !~ '[[:print:]]$' && str =~ JpKinsokuE
-            let ostr = matchstr(str, JpKinsokuE)
+          if str !~ '[[:print:]]$' && str =~ g:JpKinsokuE.'\+$'
+            let ostr = matchstr(str, g:JpKinsokuE.'\+$')
             let str = strpart(str, 0, strlen(str)-strlen(ostr))
             let lstr = ostr.lstr
           endif
