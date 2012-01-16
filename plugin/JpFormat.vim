@@ -120,7 +120,7 @@ endif
 
 " 行末禁則
 if !exists('JpKinsokuE')
-  let JpKinsokuE = '-_0-9a-zA-Z{<（［'.'([｛〔〈《「『【〝‘“'.'\¥£$＃№'
+  let JpKinsokuE = '{<（［'.'([｛〔〈《「『【〝‘“'.'\¥£$＃№'
   if &enc == 'utf-8'
     let JpKinsokuE .= '〘〖｟«'.'€'
   endif
@@ -129,7 +129,7 @@ endif
 
 " 句点と閉じ括弧
 if !exists('JpKutenParen')
-  let JpKutenParen = '、。，．'.',)\]｝、〕〉》」』】〟’”'
+  let JpKutenParen = '、。，．'.'.,)\]｝、〕〉》」』】〟’”'
   if &enc == 'utf-8'
     let JpKutenParen .= '〙〗｠»'
   endif
@@ -140,7 +140,7 @@ endif
 " 分離不可文字を追い出す時にJpNoDivNがあったら、そこから追い出し。
 " ですか？――<分割> のような行があったら ？は残して――のみを追い出す。
 if !exists('JpNoDivN')
-  let JpNoDivN = '、。，．'.')\]｝、〕〉》」』】〟’”'.'!?！？'
+  let JpNoDivN = '、。，．'.'.)\]｝、〕〉》」』】〟’”'.'!?！？'
   if &enc == 'utf-8'
     let JpNoDivN .= '〙〗｠»'.'‼⁇⁈⁉'
   endif
@@ -864,6 +864,7 @@ function! JpFormatStr(str, clidx, ...)
   let ochars = (b:JpCountOverChars)*cmode
   let catmarker = a:0 ? '' : g:JpFormatMarker
   let addcr = 0
+  let subspc = []
   let crlen = &ff=='dos' ? 2 : 1
   if chars <= 0
     return [a:str, 0]
@@ -912,6 +913,22 @@ function! JpFormatStr(str, clidx, ...)
         call add(fstr, str)
         break
       endif
+
+      " TODO: １０００ や \200,000のような分離不可処理
+      if str =~ '[[:graph:]]$' && lstr =~'^[[:graph:]]' && lstr !~ '^[.,)}\]]'
+        let estr = matchstr(str, '[[:graph:]]\+$')
+        if strlen(str) == strlen(estr)
+          let estr = matchstr(lstr, '^[[:graph:]]\+')
+          if strlen(estr) <= ochars
+            let str .= estr
+            let lstr = lstr[strlen(estr) :]
+          endif
+        else
+          let str = strpart(str, 0, strlen(str)-strlen(estr))
+          let lstr = estr.lstr
+        endif
+      endif
+
       " strの行末禁則文字を全て次行へ移動
       if str =~ g:JpKinsokuE.'\+$'
         let ostr = matchstr(str, g:JpKinsokuE.'\+$')
@@ -920,6 +937,11 @@ function! JpFormatStr(str, clidx, ...)
         if str != ''
           let str = str . catmarker
           let addcr += addline
+          if a:0
+            call add(subspc , strlen(matchstr(str, '\s*$')) + strlen(matchstr(lstr, '^\s*')))
+            let str = substitute(str, '\s*$', '', '')
+            let lstr = substitute(lstr, '^\s*', '', '')
+          endif
           call add(fstr, leader.str)
           let leader = sleader
           continue
@@ -928,14 +950,16 @@ function! JpFormatStr(str, clidx, ...)
 
       " lstrの行頭禁則文字を全て現在行へ移動
       if lstr =~ '^'.g:JpKinsoku
-        let ostr = matchstr(str, '.\{1}$').matchstr(lstr, '^'.g:JpKinsoku.'\+')
-        " 句点関係があったらそこまで
-        if ostr =~ g:JpKutenParen
-          let ostr = strpart(ostr, 0, matchend(ostr, g:JpKutenParen.'\+'))
+        if strdisplaywidth(matchstr(str, '.$')) == strdisplaywidth(matchstr(lstr, '^.'))
+          let ostr = matchstr(str, '.\{1}$').matchstr(lstr, '^'.g:JpKinsoku.'\+')
+          " 句点関係があったらそこまで
+          if ostr =~ g:JpKutenParen
+            let ostr = strpart(ostr, 0, matchend(ostr, g:JpKutenParen.'\+'))
+          endif
+          let ostr = strpart(ostr, strlen(matchstr(str, '.\{1}$')))
+          let str = str.ostr
+          let lstr = strpart(lstr, strlen(ostr))
         endif
-        let ostr = strpart(ostr, strlen(matchstr(str, '.\{1}$')))
-        let str = str.ostr
-        let lstr = strpart(lstr, strlen(ostr))
       endif
 
       " ---------- 禁則処理のメインループ ----------
@@ -970,14 +994,16 @@ function! JpFormatStr(str, clidx, ...)
         if div
           " lstrの行頭禁則文字を全て現在行へ移動
           if lstr =~ '^'.g:JpKinsoku
-            let ostr = matchstr(str, '.\{1}$').matchstr(lstr, '^'.g:JpKinsoku.'\+')
-            " 句点関係があったらそこまで
-            if ostr =~ g:JpKutenParen
-              let ostr = strpart(ostr, 0, matchend(ostr, g:JpKutenParen.'\+'))
+            if strdisplaywidth(matchstr(str, '.$')) == strdisplaywidth(matchstr(lstr, '^.'))
+              let ostr = matchstr(str, '.\{1}$').matchstr(lstr, '^'.g:JpKinsoku.'\+')
+              " 句点関係があったらそこまで
+              if ostr =~ g:JpKutenParen
+                let ostr = strpart(ostr, 0, matchend(ostr, g:JpKutenParen.'\+'))
+              endif
+              let ostr = strpart(ostr, strlen(matchstr(str, '.\{1}$')))
+              let str = str.ostr
+              let lstr = strpart(lstr, strlen(ostr))
             endif
-            let ostr = strpart(ostr, strlen(matchstr(str, '.\{1}$')))
-            let str = str.ostr
-            let lstr = strpart(lstr, strlen(ostr))
           endif
         endif
       endif
@@ -1012,6 +1038,11 @@ function! JpFormatStr(str, clidx, ...)
         let str = str . catmarker
       endif
       let addcr += addline
+      if a:0
+        call add(subspc , strlen(matchstr(str, '\s*$')) + strlen(matchstr(lstr, '^\s*')))
+        let str = substitute(str, '\s*$', '', '')
+        let lstr = substitute(lstr, '^\s*', '', '')
+      endif
       call add(fstr, leader.str)
       let leader = sleader
       if strlen(lstr) == ''
@@ -1019,6 +1050,9 @@ function! JpFormatStr(str, clidx, ...)
       endif
     endwhile
   endfor
+  if a:0
+    return [fstr, subspc]
+  endif
   return [fstr, addcr]
 endfunction
 

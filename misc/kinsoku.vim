@@ -4,7 +4,7 @@
 "                 JpFormat.vimと同じ場所かruntimepathの通った場所へコピーして
 "                 改変してください。
 "     Maintainer: fuenor@gmail.com
-"        Version: 1.02
+"        Version: 1.03
 "=============================================================================
 scriptencoding utf-8
 
@@ -41,7 +41,7 @@ endif
 let JpKinsoku = '['.JpKinsoku.']'
 
 " 行末禁則
-let JpKinsokuE = '-_0-9a-zA-Z{<（［'
+let JpKinsokuE = '{<（［'
              \ . '([｛〔〈《「『【〝‘“'
              \ . '¥\£$＃№'
 if &enc == 'utf-8'

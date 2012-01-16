@@ -274,13 +274,14 @@ endfunction
 let s:lib.jpfmt_compat = 1
 " 0 : built-in formatexr
 " 1 : JpFormat.vim + built-in formatexr
-" 2 : JpFormat.vim + autofmt.vim
-" 3 : autofmt.vim
+" 2 : JpFormat.vim
+" 3 : JpFormat.vim + autofmt.vim
+" 4 : autofmt.vim
 function! s:lib.format_lines(lnum, count)
   let lnum = a:lnum
   let prev_lines = line('$')
   let jpfmt_compat = self.get_opt('jpfmt_compat')
-  if jpfmt_compat > 1
+  if jpfmt_compat >= 3
     let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
   endif
   let lines = getline(lnum, lnum + a:count - 1)
@@ -298,7 +299,7 @@ function! s:lib.format_lines(lnum, count)
       let l = self.vimformatexpr(lnum, 1, tw)
       break
     endif
-    if compat != 3
+    if compat != 4
       let leader2 = self.get_2ndleader(lnum)
       let s:JpFormatCountMode = g:JpFormatCountMode
       let g:JpFormatCountMode = 1
@@ -307,10 +308,15 @@ function! s:lib.format_lines(lnum, count)
       if !exists('b:JpCountOverChars')
         let b:JpCountOverChars = g:JpCountOverChars
       endif
-      let [glist, addmarker]  = JpFormatStr([line], 0, '', leader2)
+      let [glist, subspc]  = JpFormatStr([line], 0, '', leader2)
       let g:JpFormatCountMode = s:JpFormatCountMode
       let b:JpCountChars      = s:JpCountChars
       if len(glist) <= 1
+        break
+      endif
+      if compat == 2
+        call append(lnum, glist)
+        silent! execute printf('silent %ddelete _ %d', lnum, 1)
         break
       endif
       let idx = 0
@@ -333,6 +339,9 @@ function! s:lib.format_lines(lnum, count)
         break
       else
         let col = strlen(join(glist[: idx-1], ''))-llen*(idx-1)
+        for i in range(idx-1)
+          let col += subspc[i]
+        endfor
         let line2 = strpart(line, col)
         let line2 = substitute(line2, '^\s*', '', '')
         call append(lnum, leader2.line2)
@@ -353,7 +362,7 @@ function! s:lib.format_lines(lnum, count)
       else
         silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
       endif
-    elseif compat >= 2
+    elseif compat >= 3
       let col = self.find_boundary(line)
       if col == -1
         break
@@ -362,14 +371,14 @@ function! s:lib.format_lines(lnum, count)
       let line2 = substitute(line[col :], '^\s*', '', '')
       call setline(lnum, line1)
     endif
-    if jpfmt_compat == 1
-      let leader = leader2
-    else
+    if jpfmt_compat >= 3
       if fo_2 != -1
         let leader = fo_2
       else
         let leader = self.make_leader(lnum + 1)
       endif
+    else
+      let leader = leader2
     endif
     call append(lnum, leader.line2)
     let lnum += 1
