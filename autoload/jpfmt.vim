@@ -215,12 +215,73 @@ function s:lib.has_sign()
   return len(lines) > 1
 endfunction
 
+function s:lib.comp_indent(lnum)
+  if &indentexpr != ''
+    if &paste
+      return 0
+    endif
+    let v:lnum = a:lnum
+    return eval(&indentexpr)
+  elseif &cindent
+    if &paste
+      return 0
+    endif
+    return cindent(a:lnum)
+  elseif &lisp
+    if &paste
+      return 0
+    endif
+    if !&autoindent
+      return 0
+    endif
+    return lispindent(a:lnum)
+  elseif &smartindent
+    if &paste
+      return 0
+    endif
+    return self.smartindent(a:lnum)
+  elseif &autoindent
+    return indent(a:lnum - 1)
+  endif
+  return 0
+endfunction
+
+function s:lib.smartindent(lnum)
+  if &paste
+    return 0
+  endif
+  let prev_lnum = a:lnum - 1
+  while prev_lnum > 1 && getline(prev_lnum) =~ '^#'
+    let prev_lnum -= 1
+  endwhile
+  if prev_lnum <= 1
+    return 0
+  endif
+  let prev_line = getline(prev_lnum)
+  let firstword = matchstr(prev_line, '^\s*\zs\w\+')
+  let cinwords = split(&cinwords, ',')
+  if prev_line =~ '{$' || index(cinwords, firstword) != -1
+    let n = indent(prev_lnum) + &shiftwidth
+    if &shiftround
+      let n = n - (n % &shiftwidth)
+    endif
+    return n
+  endif
+  return indent(prev_lnum)
+endfunction
+
 " === jpfmt.vim
 
-" let s:autofmt = autofmt#compat#import()
-" let s:autofmt = autofmt#japanese#import()
-" let s:lib = {}
-" call extend(s:lib, s:autofmt)
+if !exists('g:jpfmt_use_autofmt')
+  let g:jpfmt_use_autofmt = 0
+endif
+if g:jpfmt_use_autofmt
+  silent! let s:autofmt = autofmt#compat#import()
+  if exists('s:autofmt')
+    let s:lib = {}
+    call extend(s:lib, s:autofmt)
+  endif
+endif
 
 let s:lib.jpfmt_paragraph        = 1
 let s:lib.jpfmt_paragraph_regexp = '^[　「]'
@@ -321,9 +382,9 @@ function! s:lib.format_lines(lnum, count)
       endif
       let idx = 0
       let llen = strlen(leader2)
-      for i in range(len(glist)-1)
-        let line1 = glist[i]
-        let line2 = glist[i+1]
+      for i in range(1, len(glist)-1)
+        let line1 = glist[i-1]
+        let line2 = glist[i]
         let line2 = substitute(line2[llen :], '^\s*', '', '')
         " 分割位置が日本語の行までJpFormatの整形を使用
         if line1 =~ '[^[:print:]]$' || line2 =~ '^[^[:print:]]'
@@ -333,23 +394,34 @@ function! s:lib.format_lines(lnum, count)
         endif
       endfor
       if idx == 0
+        if compat == 1
+          let vcount = 0
+          for str in glist
+            if str =~ '[^[:print:]]$'
+              let vcount = 1
+              break
+            endif
+          endfor
+          if vcount == 0
+            let l = self.vimformatexpr(lnum, 1, tw)
+            break
+          endif
+        endif
       elseif idx == len(glist)-1
         call append(lnum, glist)
         silent! execute printf('silent %ddelete _ %d', lnum, 1)
         break
       else
+        call append(lnum, glist[: idx-1])
+        silent! execute printf('silent %ddelete _ %d', lnum, 1)
+        let lnum += idx-1
         let col = strlen(join(glist[: idx-1], ''))-llen*(idx-1)
         for i in range(idx-1)
           let col += subspc[i]
         endfor
         let line2 = strpart(line, col)
         let line2 = substitute(line2, '^\s*', '', '')
-        call append(lnum, leader2.line2)
-        call append(lnum, glist[: idx-1])
-        silent! execute printf('silent %ddelete _ %d', lnum, 1)
-        let lnum += idx
-        let fo_2 = -1
-        continue
+        let compat = 0
       endif
     endif
     if compat == 1
@@ -372,15 +444,23 @@ function! s:lib.format_lines(lnum, count)
       call setline(lnum, line1)
     endif
     if jpfmt_compat >= 3
+      call append(lnum, line2)
       if fo_2 != -1
         let leader = fo_2
       else
         let leader = self.make_leader(lnum + 1)
       endif
+      call setline(lnum + 1, leader . line2)
     else
-      let leader = leader2
+      if leader2 =~ '^\s*$'
+        call append(lnum, line2)
+        let leader = self.get_indent(lnum+1)
+        call setline(lnum + 1, leader . line2)
+      else
+        let leader = leader2
+        call append(lnum, leader.line2)
+      endif
     endif
-    call append(lnum, leader.line2)
     let lnum += 1
     let fo_2 = -1
   endwhile
@@ -501,6 +581,20 @@ function! s:lib.get_vim_paragraph(fline, lline)
     call add(res, [start, len(glist)-start])
   endif
   return res
+endfunction
+
+function! s:lib.get_indent(lnum)
+  let prev_line = getline(a:lnum - 1)
+
+  let listpat = matchstr(prev_line, &formatlistpat)
+
+  if self.has_format_options('n') && listpat != ''
+    let indent = repeat(' ', s:strdisplaywidth(listpat))
+  else
+    let indent = repeat(' ', self.comp_indent(a:lnum))
+  endif
+
+  return indent
 endfunction
 
 let &cpo = s:cpo_save
