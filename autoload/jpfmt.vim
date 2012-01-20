@@ -31,6 +31,7 @@
 "               日本語の禁則処理にはJpFormat.vimがそのまま使用されているので、
 "               JpFormat.vimのオプションが有効です。
 "
+scriptencoding utf-8
 let s:cpo_save = &cpo
 set cpo&vim
 

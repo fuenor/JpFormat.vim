@@ -1,6 +1,7 @@
 " 設定にかかわらず、ぶら下げを行わない整形を行う
 " その他はjpfmt.vimと同じ
 
+scriptencoding utf-8
 let s:cpo_save = &cpo
 set cpo&vim
 

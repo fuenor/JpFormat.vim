@@ -2,6 +2,7 @@
 " let jpfmt_paragraph_regexp = '' かつ、ぶら下げを行わない整形を行う
 " Vimデフォルトのgqコマンドに日本語禁則処理を付け加えただけのように振る舞う。
 
+scriptencoding utf-8
 let s:cpo_save = &cpo
 set cpo&vim
 
