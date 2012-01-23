@@ -345,6 +345,8 @@ function! s:lib.format_lines(lnum, count)
   let jpfmt_compat = self.get_opt('jpfmt_compat')
   if jpfmt_compat >= 3
     let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
+  else
+    let leader2 = self.get_2ndleader(lnum)
   endif
   let lines = getline(lnum, lnum + a:count - 1)
   let tw = strdisplaywidth(join(lines), '')
@@ -362,7 +364,6 @@ function! s:lib.format_lines(lnum, count)
       break
     endif
     if compat != 4
-      let leader2 = self.get_2ndleader(lnum)
       let s:JpFormatCountMode = g:JpFormatCountMode
       let g:JpFormatCountMode = 1
       let s:JpCountChars      = exists('b:JpCountChars') ? b:JpCountChars : g:JpCountChars
