@@ -459,8 +459,7 @@ function! s:lib.format_lines(lnum, count)
         let leader = self.get_indent(lnum+1)
         call setline(lnum + 1, leader . line2)
       else
-        let leader = leader2
-        call append(lnum, leader.line2)
+        call append(lnum, leader2.line2)
       endif
     endif
     let lnum += 1

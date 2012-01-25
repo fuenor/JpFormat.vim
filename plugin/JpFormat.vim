@@ -4,18 +4,18 @@
 "                 http://sites.google.com/site/fudist/Home/jpformat
 "=============================================================================
 scriptencoding utf-8
-let s:Version = 1.20
+let s:version = 120
 
 if exists('disable_JpFormat') && disable_JpFormat
   finish
 endif
-if exists('g:JpFormat_version') && g:JpFormat_version < s:Version
+if exists('g:JpFormat_version') && g:JpFormat_version < s:version
   let g:loaded_JpFormat = 0
 endif
 if exists("g:loaded_JpFormat") && g:loaded_JpFormat && !exists('fudist')
   finish
 endif
-let g:JpFormat_version = s:Version
+let g:JpFormat_version = s:version
 let g:loaded_JpFormat = 1
 if &cp
   finish
