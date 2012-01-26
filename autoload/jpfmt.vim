@@ -1,5 +1,5 @@
 " Maintainer:   <fuenor@gmail.com>
-" Description:  日本語gqコマンドスクリプト Version. 1.03
+" Description:  日本語gqコマンドスクリプト Version. 1.04
 "               日本語の禁則処理に対応した整形処理を行います。
 "
 " Caution:      !!!!!!!! 動作にはJpFormat.vimが必要です !!!!!!!!
@@ -271,13 +271,37 @@ function s:lib.smartindent(lnum)
   return indent(prev_lnum)
 endfunction
 
+function s:lib.retab(line, ...)
+  let col = get(a:000, 0, 0)
+  let expandtab = get(a:000, 1, &expandtab)
+  let tabstop = get(a:000, 2, &tabstop)
+  let s2 = matchstr(a:line, '^\s*', col)
+  if s2 == ''
+    return a:line
+  endif
+  let s1 = strpart(a:line, 0, col)
+  let t = strpart(a:line, col + len(s2))
+  let n1 = s:strdisplaywidth(s1)
+  let n2 = s:strdisplaywidth(s2, n1)
+  if expandtab
+    let s2 = repeat(' ', n2)
+  else
+    if n1 != 0 && n2 >= (tabstop - (n1 % tabstop))
+      let n2 += n1 % tabstop
+    endif
+    let s2 = repeat("\t", n2 / tabstop) . repeat(' ', n2 % tabstop)
+  endif
+  return s1 . s2 . t
+endfunction
+
 " === jpfmt.vim
 
 if !exists('g:jpfmt_use_autofmt')
   let g:jpfmt_use_autofmt = 0
 endif
 if g:jpfmt_use_autofmt
-  silent! let s:autofmt = autofmt#compat#import()
+  " silent! let s:autofmt = autofmt#compat#import()
+  silent! let s:autofmt = autofmt#japanese#import()
   if exists('s:autofmt')
     let s:lib = {}
     call extend(s:lib, s:autofmt)
@@ -350,20 +374,12 @@ function! s:lib.format_lines(lnum, count)
   endif
   let lines = getline(lnum, lnum + a:count - 1)
   let tw = strdisplaywidth(join(lines), '')
-  let l = self.vimformatexpr(lnum, a:count, tw)
+  let l = self.vimformatexpr(lnum, a:count, tw+1)
   let tw = self.textwidth
-  if jpfmt_compat == 0
-    let l = self.vimformatexpr(lnum, 1, tw)
-    return line('$') - prev_lines
-  endif
   while 1
     let line = getline(lnum)
     let compat = jpfmt_compat
-    if compat == 1 && !(line =~ '[^[:print:]]')
-      let l = self.vimformatexpr(lnum, 1, tw)
-      break
-    endif
-    if compat != 4
+    if compat == 1 || compat == 2 || compat == 3
       let s:JpFormatCountMode = g:JpFormatCountMode
       let g:JpFormatCountMode = 1
       let s:JpCountChars      = exists('b:JpCountChars') ? b:JpCountChars : g:JpCountChars
@@ -396,19 +412,6 @@ function! s:lib.format_lines(lnum, count)
         endif
       endfor
       if idx == 0
-        if compat == 1
-          let vcount = 0
-          for str in glist
-            if str =~ '[^[:print:]]$'
-              let vcount = 1
-              break
-            endif
-          endfor
-          if vcount == 0
-            let l = self.vimformatexpr(lnum, 1, tw)
-            break
-          endif
-        endif
       elseif idx == len(glist)-1
         call append(lnum, glist)
         silent! execute printf('silent %ddelete _ %d', lnum, 1)
@@ -423,20 +426,10 @@ function! s:lib.format_lines(lnum, count)
         endfor
         let line2 = strpart(line, col)
         let line2 = substitute(line2, '^\s*', '', '')
-        let compat = 0
+        let compat = -1
       endif
     endif
-    if compat == 1
-      let l = self.vimformatexpr(lnum, 1, tw)
-      let line1 = getline(lnum)
-      let col = l == 1 ? -1 : (strlen(getline(lnum)))
-      let line2 = substitute(line[col :], '^\s*', '', '')
-      if l == 1
-        break
-      else
-        silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
-      endif
-    elseif compat >= 3
+    if compat >= 3
       let col = self.find_boundary(line)
       if col == -1
         break
@@ -444,6 +437,17 @@ function! s:lib.format_lines(lnum, count)
       let line1 = substitute(line[: col - 1], '\s*$', '', '')
       let line2 = substitute(line[col :], '^\s*', '', '')
       call setline(lnum, line1)
+    elseif compat >= 0
+      let l = self.vimformatexpr(lnum, 1, tw)
+      let line1 = substitute(getline(lnum), '^\s*', '', '')
+      let line = substitute(line, '^\s*', '', '')
+      let col = strlen(line1)
+      let line2 = substitute(line[col :], '^\s*', '', '')
+      if l == 1
+        break
+      else
+        silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
+      endif
     endif
     if jpfmt_compat >= 3
       call append(lnum, line2)
@@ -504,13 +508,13 @@ function! s:lib.get_2ndleader(lnum)
   let saved_cursor = getpos(".")
   let line = getline(lnum)
   let tw = strdisplaywidth(line)
-  let test = line . repeat('あ', 2)
+  let test = line . 'んんん'
   call setline(lnum, test)
   let l = self.vimformatexpr(lnum, 1, tw)
   call setline(lnum, line)
   let leader2 = ''
   if l > 1
-    let leader2 = substitute(getline(lnum+1), 'あ\+$', '', '')
+    let leader2 = substitute(getline(lnum+1), 'ん\+$', '', '')
     silent! execute printf('silent %ddelete _ %d', lnum + 1, l - 1)
   endif
   call setpos('.', saved_cursor)
@@ -544,9 +548,12 @@ function! s:lib.get_vim_paragraph(fline, lline)
     let cleader = cleader =~ '^\s\+$' ? ' ' : substitute(cleader, '^\s*\|\s*$', '', 'g')
     let write = 0
 
-    """""" のように2nd leaderが '' でコメント行の場合
     " gqはコメント記号のみの行を整形しない
-    if cleader == '' && pleader =~ '[^[:space:]]'
+    if cleader != '' &&  glist[idx] =~ '^\s*\V'.escape(cleader, '\\')
+      if glist[idx] =~ '^[[:space:]'.escape(cleader, '\\]').']*$'
+        let cleader = 'ハイハイサー'
+      endif
+    elseif cleader == '' && pleader =~ '[^[:space:]]'
       if glist[idx] =~ '^\s*\V'.escape(pleader, '\\')
         let cleader = 'パパラパー'
       endif
@@ -593,6 +600,17 @@ function! s:lib.get_indent(lnum)
     let indent = repeat(' ', s:strdisplaywidth(listpat))
   else
     let indent = repeat(' ', self.comp_indent(a:lnum))
+  endif
+
+  if &copyindent
+    if jpfmt_use_autofmt
+      let [indent, rest] = self.copy_indent(prev_line, indent)
+      let indent = indent . rest
+    else
+      let indent = self.retab(indent)
+    endif
+  else
+    let indent = self.retab(indent)
   endif
 
   return indent
