@@ -271,6 +271,20 @@ function s:lib.smartindent(lnum)
   return indent(prev_lnum)
 endfunction
 
+function s:lib.copy_indent(line1, line2)
+  " @return [copied_indent, rest_indent . text]
+  let indent1 = matchstr(a:line1, '^\s*')
+  let indent2 = matchstr(a:line2, '^\s*')
+  let text = matchstr(a:line2, '^\s*\zs.*$')
+  let n1 = s:strdisplaywidth(indent1)
+  let n2 = s:strdisplaywidth(indent2)
+  let indent = matchstr(indent1, '^\s*\%<' . (n2 + 2) . 'v')
+  if n2 > n1
+    let text = repeat(' ', n2 - n1) . text
+  endif
+  return [indent, text]
+endfunction
+
 function s:lib.retab(line, ...)
   let col = get(a:000, 0, 0)
   let expandtab = get(a:000, 1, &expandtab)
@@ -358,16 +372,22 @@ function! s:lib.jpformat_normal_mode(lnum, count)
 endfunction
 
 let s:lib.jpfmt_compat = 1
-" 0 : built-in formatexr
-" 1 : JpFormat.vim + built-in formatexr
-" 2 : JpFormat.vim
-" 3 : JpFormat.vim + autofmt.vim
-" 4 : autofmt.vim
+" -1 : built-in formatexr (debug)
+" 0  : built-in formatexr
+" 1  : JpFormat.vim + built-in formatexr
+" 2  : JpFormat.vim
+" 3  : JpFormat.vim + autofmt.vim
+" 4  : autofmt.vim
 function! s:lib.format_lines(lnum, count)
   let lnum = a:lnum
   let prev_lines = line('$')
   let jpfmt_compat = self.get_opt('jpfmt_compat')
-  if jpfmt_compat >= 3
+
+  if jpfmt_compat == -1
+    let tw = self.comp_textwidth(0)
+    let l = self.vimformatexpr(lnum, a:count, tw)
+    return line('$') - prev_lines
+  elseif jpfmt_compat >= 3
     let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
   else
     let leader2 = self.get_2ndleader(lnum)
@@ -603,12 +623,7 @@ function! s:lib.get_indent(lnum)
   endif
 
   if &copyindent
-    if jpfmt_use_autofmt
-      let [indent, rest] = self.copy_indent(prev_line, indent)
-      let indent = indent . rest
-    else
-      let indent = self.retab(indent)
-    endif
+    let [indent, rest] = self.copy_indent(prev_line, indent)
   else
     let indent = self.retab(indent)
   endif
