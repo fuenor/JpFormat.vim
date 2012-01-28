@@ -387,13 +387,23 @@ function! s:lib.format_lines(lnum, count)
     let tw = self.comp_textwidth(0)
     let l = self.vimformatexpr(lnum, a:count, tw)
     return line('$') - prev_lines
-  elseif jpfmt_compat >= 3
+  endif
+  let lines = join(getline(lnum, lnum + a:count - 1), '')
+  if jpfmt_compat == 1 && lines =~ '^[[:print:]]*$'
+    let tw = self.comp_textwidth(0)
+    let l = self.vimformatexpr(lnum, a:count, tw)
+    return line('$') - prev_lines
+  endif
+  if jpfmt_compat >= 3
     let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
   else
     let leader2 = self.get_2ndleader(lnum)
   endif
-  let lines = getline(lnum, lnum + a:count - 1)
-  let tw = strdisplaywidth(join(lines), '')
+
+  " FIXME: autofmt.vimのバグ
+  " 本来は一括Joinではなく一行づつ整形しながら連結する必要がある。
+  " このため整形境界が行の境界と一致した場合にインデントが失われる
+  let tw = strdisplaywidth(lines)
   let l = self.vimformatexpr(lnum, a:count, tw+1)
   let tw = self.textwidth
   while 1
