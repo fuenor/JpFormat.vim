@@ -382,41 +382,42 @@ function! s:lib.format_lines(lnum, count)
   let lnum = a:lnum
   let prev_lines = line('$')
   let jpfmt_compat = self.get_opt('jpfmt_compat')
+  let tw = self.textwidth
 
   if jpfmt_compat == -1
-    let tw = self.comp_textwidth(0)
     let l = self.vimformatexpr(lnum, a:count, tw)
     return line('$') - prev_lines
   endif
-  let lines = join(getline(lnum, lnum + a:count - 1), '')
-  if jpfmt_compat == 1 && lines =~ '^[[:print:]]*$'
-    let tw = self.comp_textwidth(0)
-    let l = self.vimformatexpr(lnum, a:count, tw)
-    return line('$') - prev_lines
+  let lines = getline(lnum, lnum + a:count - 1)
+  if jpfmt_compat == 1
+    " if join(lines, '') !~ '[^[:print:][:space:]]'
+    if s:count(lines, '[^[:print:][:space:]]') == 0
+      let l = self.vimformatexpr(lnum, a:count, tw)
+      return line('$') - prev_lines
+    elseif a:count == 1 && s:strdisplaywidth(getline(lnum)) <= tw
+      return line('$') - prev_lines
+    endif
   endif
   if jpfmt_compat >= 3
-    let fo_2 = self.get_second_line_leader(getline(lnum, lnum + a:count - 1))
+    let fo_2 = self.get_second_line_leader(lines)
   else
     let leader2 = self.get_2ndleader(lnum)
   endif
 
-  " FIXME: autofmt.vimのバグ
-  " 本来は一括Joinではなく一行づつ整形しながら連結する必要がある。
-  " このため整形境界が行の境界と一致した場合にインデントが失われる
-  let tw = strdisplaywidth(lines)
-  let l = self.vimformatexpr(lnum, a:count, tw+1)
-  let tw = self.textwidth
+  let twj = s:strdisplaywidth(join(lines, '')) + 1
+  let l = self.vimformatexpr(lnum, a:count, twj)
   while 1
     let line = getline(lnum)
     let compat = jpfmt_compat
     if compat == 1 || compat == 2 || compat == 3
       let s:JpFormatCountMode = g:JpFormatCountMode
-      let g:JpFormatCountMode = 1
       let s:JpCountChars      = exists('b:JpCountChars') ? b:JpCountChars : g:JpCountChars
       let b:JpCountChars      = self.textwidth
       if !exists('b:JpCountOverChars')
         let b:JpCountOverChars = g:JpCountOverChars
       endif
+      let b:JpCountOverChars = b:JpCountOverChars*g:JpFormatCountMode
+      let g:JpFormatCountMode = 1
       let [glist, subspc]  = JpFormatStr([line], 0, '', leader2)
       let g:JpFormatCountMode = s:JpFormatCountMode
       let b:JpCountChars      = s:JpCountChars
@@ -502,6 +503,15 @@ function! s:lib.format_lines(lnum, count)
   return line('$') - prev_lines
 endfunction
 
+function s:count(lines, expr)
+  for l in a:lines
+    if l =~ a:expr
+      return 1
+    endif
+  endfor
+  return 0
+endfunction
+
 function! s:lib.is_comment(line)
   let leader = self.get_2ndleader(line('.'))
   return leader =~ '[[:graph:]]'
@@ -537,7 +547,7 @@ function! s:lib.get_2ndleader(lnum)
   endif
   let saved_cursor = getpos(".")
   let line = getline(lnum)
-  let tw = strdisplaywidth(line)
+  let tw = s:strdisplaywidth(line)
   let test = line . 'んんん'
   call setline(lnum, test)
   let l = self.vimformatexpr(lnum, 1, tw)
