@@ -896,7 +896,7 @@ function! JpFormatStr(str, clidx, ...)
     while 1
       let chars = defchars
       if leader != ''
-        let col = strdisplaywidth(leader)
+        let col = s:strdisplaywidth(leader)
         let chars -= col
         if chars < 1
           let chars = 1
@@ -950,7 +950,7 @@ function! JpFormatStr(str, clidx, ...)
 
       " lstrの行頭禁則文字を全て現在行へ移動
       if lstr =~ '^'.g:JpKinsoku
-        if strdisplaywidth(matchstr(str, '.$')) == strdisplaywidth(matchstr(lstr, '^.'))
+        if s:strdisplaywidth(matchstr(str, '.$')) == s:strdisplaywidth(matchstr(lstr, '^.'))
           let ostr = matchstr(str, '.\{1}$').matchstr(lstr, '^'.g:JpKinsoku.'\+')
           " 句点関係があったらそこまで
           if ostr =~ g:JpKutenParen
@@ -994,7 +994,7 @@ function! JpFormatStr(str, clidx, ...)
         if div
           " lstrの行頭禁則文字を全て現在行へ移動
           if lstr =~ '^'.g:JpKinsoku
-            if strdisplaywidth(matchstr(str, '.$')) == strdisplaywidth(matchstr(lstr, '^.'))
+            if s:strdisplaywidth(matchstr(str, '.$')) == s:strdisplaywidth(matchstr(lstr, '^.'))
               let ostr = matchstr(str, '.\{1}$').matchstr(lstr, '^'.g:JpKinsoku.'\+')
               " 句点関係があったらそこまで
               if ostr =~ g:JpKutenParen
@@ -1010,9 +1010,9 @@ function! JpFormatStr(str, clidx, ...)
 
       " ぶら下がり文字数を超えている時、JpKinsokuO以外の1文字を足して追い出す。
       if outstr && ochars >= 0
-        " let ofs = strdisplaywidth(matchstr(str, '\%'.(chars+ochars).'v.')) > 1
+        " let ofs = s:strdisplaywidth(matchstr(str, '\%'.(chars+ochars).'v.')) > 1
         let ofs = 0
-        if strdisplaywidth(str) > chars+ochars+ofs
+        if s:strdisplaywidth(str) > chars+ochars+ofs
           let ostr = matchstr(str, '.'.g:JpKinsoku.'*'.JpKinsokuO.'\+$')
           if ostr =~ '^[[:print]]'
             let ostr = matchstr(ostr, '^.\zs.*')
@@ -1059,22 +1059,22 @@ endfunction
 function! s:getdwstr(lstr, chars, leader)
   let leader = a:leader
   let llen = strlen(leader)
-  let chars = strdisplaywidth(leader)+a:chars
+  let chars = s:strdisplaywidth(leader)+a:chars
   let lstr = leader.a:lstr
   let str = substitute(lstr, '\%>'.chars.'v.*','','')
 
-  if strdisplaywidth(str) == chars
+  if s:strdisplaywidth(str) == chars
     return str[llen :]
   endif
   if strlen(str) < strlen(lstr)
     for n in range(strlen(str), strlen(lstr)-1)
-      if strdisplaywidth(str) >= chars
+      if s:strdisplaywidth(str) >= chars
         break
       endif
-      let str .= matchstr(lstr, '\%'.(strdisplaywidth(str)+1).'v.')
+      let str .= matchstr(lstr, '\%'.(s:strdisplaywidth(str)+1).'v.')
     endfor
   endif
-  if strdisplaywidth(str) > chars
+  if s:strdisplaywidth(str) > chars
     let str = substitute(str, '.$', '', '')
   endif
   let str = str[llen :]
@@ -1255,7 +1255,9 @@ function!  JpFormatGq(fline, lline, mode, ...)
   let chars = (b:JpCountChars)*cmode
   silent! exec 'setlocal textwidth='.chars
 
-  if g:JpFormat_formatexpr != ''
+  if g:JpFormat_formatexpr == 'jpcpt#formatexpr()'
+    silent! exec 'setlocal formatexpr='
+  elseif g:JpFormat_formatexpr != ''
     silent! exec 'setlocal formatexpr='.g:JpFormat_formatexpr
   endif
 
@@ -1417,6 +1419,32 @@ endfunction
 function! JpJoinGq(fline, lline, mode)
   call JpFormatGq(a:fline, a:lline, a:mode, 'join')
 endfunction
+
+"=============================================================================
+" strdisplaywidth()はVim 7.3以降
+
+if exists('*strdisplaywidth')
+  let s:strdisplaywidth = function('strdisplaywidth')
+else
+  function s:strdisplaywidth(str, ...)
+    let vcol = get(a:000, 0, 0)
+    let w = 0
+    for c in split(a:str, '\zs')
+      if c == "\t"
+        let w += &tabstop - ((vcol + w) % &tabstop)
+      elseif c =~ '^.\%2v'  " single-width char
+        let w += 1
+      elseif c =~ '^.\%3v'  " double-width char or ctrl-code (^X)
+        let w += 2
+      elseif c =~ '^.\%5v'  " <XX>    (^X with :set display=uhex)
+        let w += 4
+      elseif c =~ '^.\%7v'  " <XXXX>  (e.g. U+FEFF)
+        let w += 6
+      endif
+    endfor
+    return w
+  endfunction
+endif
 
 "=============================================================================
 "    Description: 外部ビューア呼び出し
