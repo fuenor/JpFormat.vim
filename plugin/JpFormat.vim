@@ -4,7 +4,7 @@
 "                 http://sites.google.com/site/fudist/Home/jpformat
 "=============================================================================
 scriptencoding utf-8
-let s:version = 120
+let s:version = 121
 
 if exists('disable_JpFormat') && disable_JpFormat
   finish
@@ -76,7 +76,6 @@ if !exists('JpAutoJoin')
 endif
 
 " JpFormatGqMode = 0 のときインデントを有効にする
-" JpFormatGqMode = 0 のときインデントを有効にする
 " 0 : インデント等を使用しないで整形
 " 1 : インデント等を内部整形で対応
 " 2 : インデント等をJpFormat_iformatexprで処理
@@ -111,18 +110,18 @@ endfunction
 
 " 行頭禁則
 if !exists('JpKinsoku')
-  let JpKinsoku = '-}>）―～－ｰ］！？゛゜ゝゞ｡｣､･ﾞﾟ'.',)\]｝、〕〉》」』】〟’”'.'ヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々'.'‐'.'?!'.'・:;'.'。.'.'…‥'.'°′″‰℃'
+  let JpKinsoku = '-}>）―～－ｰ］！？゛゜ゝゞ｡｣､･ﾞﾟ'.',)\]｝、〕〉》」』】〟’”'.'ヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々'.'‐'.'?!'.'・:;'.'。.'.'…‥'
   if &enc == 'utf-8'
-    let JpKinsoku .= '〙〗｠»'.'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'.'〻'.'〜'.'‼⁇⁈⁉'.'゠'.'–'.'—〳〴〵'.'¢ℓ㏋'
+    let JpKinsoku .= '〙〗｠»'.'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'.'〻'.'〜'.'‼⁇⁈⁉'.'゠'.'–'.'—〳〴〵'
   endif
   let JpKinsoku = '['.JpKinsoku.']'
 endif
 
 " 行末禁則
 if !exists('JpKinsokuE')
-  let JpKinsokuE = '{<（［'.'([｛〔〈《「『【〝‘“'.'\¥£$＃№'
+  let JpKinsokuE = '{<（［'.'([｛〔〈《「『【〝‘“'
   if &enc == 'utf-8'
-    let JpKinsokuE .= '〘〖｟«'.'€'
+    let JpKinsokuE .= '〘〖｟«'
   endif
   let JpKinsokuE = '['.JpKinsokuE.']'
 endif
@@ -168,9 +167,9 @@ endif
 " ぶら下がり文字数を超えている時、JpKinsokuO以外の1文字を足して追い出す。
 " 未設定時にはJpKinsokuで代用される。
 if !exists('JpKinsokuO')
-  " let JpKinsokuO = '-}>）―～－ｰ］！？゛゜ゝゞ｡｣､･ﾞﾟ'.',)\]｝、〕〉》」』】〟’”' . 'ヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々'.'‐'.'?!'.'・:;'.'。.'.'…‥'.'°′″‰℃'
+  " let JpKinsokuO = '-}>）―～－ｰ］！？゛゜ゝゞ｡｣､･ﾞﾟ'.',)\]｝、〕〉》」』】〟’”' . 'ヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々'.'‐'.'?!'.'・:;'.'。.'.'…‥'.'°′″'
   " if &enc == 'utf-8'
-  "   let JpKinsokuO .= '〙〗｠»'.'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'.'〻'.'〜'.'‼⁇⁈⁉'.'゠'.'–'.'—〳〴〵'.'¢ℓ㏋'
+  "   let JpKinsokuO .= '〙〗｠»'.'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'.'〻'.'〜'.'‼⁇⁈⁉'.'゠'.'–'.'—〳〴〵'
   " endif
   " let JpKinsokuO = '['.JpKinsokuO']'
 endif

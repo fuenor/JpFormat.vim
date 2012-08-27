@@ -26,7 +26,6 @@ let JpKinsoku = '-}>）―～－ｰ］！？゛゜ゝゞ｡｣､･ﾞﾟ'
             \ . '・:;'
             \ . '。.'
             \ . '…‥'
-            \ . '°′″‰℃'
 if &enc == 'utf-8'
   let JpKinsoku .= '〙〗｠»'
                \ . 'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'
@@ -36,17 +35,14 @@ if &enc == 'utf-8'
                \ . '゠'
                \ . '–'
                \ . '—〳〴〵'
-               \ . '¢ℓ㏋'
 endif
 let JpKinsoku = '['.JpKinsoku.']'
 
 " 行末禁則
 let JpKinsokuE = '{<（［'
              \ . '([｛〔〈《「『【〝‘“'
-             \ . '¥\£$＃№'
 if &enc == 'utf-8'
   let JpKinsokuE .= '〘〖｟«'
-                \ . '€'
 endif
 let JpKinsokuE = '['.JpKinsokuE.']'
 
@@ -99,7 +95,6 @@ endif
 "              \ . '・:;'
 "              \ . '。.'
 "              \ . '…‥'
-"              \ . '°′″‰℃'
 " if &enc == 'utf-8'
 "   let JpKinsokuO .= '〙〗｠»'
 "                 \ . 'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'
@@ -109,7 +104,6 @@ endif
 "                 \ . '゠'
 "                 \ . '–'
 "                 \ . '—〳〴〵'
-"                 \ . '¢ℓ㏋'
 " endif
 " let JpKinsokuO = '['.JpKinsokuO.']'
 
