@@ -296,8 +296,13 @@ https://github.com/fuenor/vim-wordcount/blob/master/wordcount.vim
 します。 >
   :let b:JpCountChars=30
 
-.txtファイルだけは常に20文字で折り返したい時は.vimrcで次のように設定します。 >
-  au BufRead,BufNewFile *.txt let b:JpCountChars=20
+特定拡張子や特定ファイルで個別の文字数で折り返したい時は.vimrcで次のように設定します。 >
+  " 拡張子howmの折り返し文字数は30文字
+  au BufRead,BufNewFile *.howm  let b:JpCountChars=30
+  " 拡張子txtの折り返し文字数は20文字
+  au BufRead,BufNewFile *.txt   let b:JpCountChars=20
+  " abc.txtの折り返し文字数は42文字
+  au BufRead,BufNewFile abc.txt let b:JpCountChars=42
 
 textwidthから折り返し文字数を設定する事も出来ます。 >
   "折り返し文字数は textwidthから設定する
