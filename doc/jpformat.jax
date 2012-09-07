@@ -6,22 +6,23 @@
             http://sites.google.com/site/fudist/Home/jpformat
 ==============================================================================
 
-CONTENTS					*jpformat-contents*
-1. Intro                                        |jpformat-intro|
-2. インストール                                 |jpformat-install|
-3. コマンド一覧                                 |jpformat-command|
-4. 手動整形                                     |jpformat-format|
-5. 自動整形                                     |jpformat-auto-format|
-6. 整形行の連結                                 |jpformat-join|
-7. 原稿枚数を計算する。                         |jpformat-count|
-8. オプション                                   |jpformat-options|
-9. 整形の内部処理                               |jpformat-formatexpr|
-10. 外部ビューアを起動する                      |jpformat-viewer|
-11. Tips                                        |jpformat-tips|
-12. オプションリスト                            |jpformat-option-list|
+CONTENTS					*jpformat_contents*
+1. Intro                                        |jpformat_intro|
+2. インストール                                 |jpformat_install|
+  2.1 gqコマンドとして使用する場合の設定        |jpformat_install_gq|
+3. コマンド一覧                                 |jpformat_command|
+4. 手動整形                                     |jpformat_format|
+5. 自動整形                                     |jpformat_auto_format|
+6. 整形行の連結                                 |jpformat_join|
+7. 原稿枚数を計算する。                         |jpformat_count|
+8. オプション                                   |jpformat_options|
+9. 整形の内部処理                               |jpformat_formatexpr|
+10. 外部ビューアを起動する                      |jpformat_viewer|
+11. Tips                                        |jpformat_tips|
+12. オプションリスト                            |jpformat_option_list|
 
 ==============================================================================
-1. Intro						*jpformat-intro*
+1. Intro						*jpformat_intro*
 
 JpFormat.vimはVimで日本語の禁則処理に対応したフォーマット整形プラグインです。
 
@@ -50,26 +51,53 @@ Vimでのメールの下書きや、青空文庫の小説などの長文を読�
 このファイルもJpFormat.vimを使用して整形されています。
 
 ==============================================================================
-2. インストール						*jpformat-install*
+2. インストール						*jpformat_install*
 
-jpformat.zipを解凍して vimfiles(.vim) などランタイムパスの通ったディレクトリに
-コピーします。
+jpformat.zipを解凍してできたjpfmtディレクトリにランタイムパスを通します。
+
+    1. jpformat.zipを解凍します。
+    2. jpfmt というディレクトリが作成されます。
+      (GitHubからダウンロードした場合は解凍してできたディレクトリ名に読み替え
+      てください)
+    3. jpfmt を適当な場所にコピーして、ランタイムパスを通します。
+
+c:\tempにjpfmtをコピーした場合は、_vimrc(Linuxは .vimrc) で次のようにパスを通
+します。
+>
+  set runtimepath+=c:/temp/jpfmt
+
+2.1 gqコマンドとして使用する場合の設定 			*jpformat_install_gq*
 
 JpFormat.vimにはgqコマンドとして使用可能な、日本語禁則処理対応の整形プラグイン
 jpfmt.vimとjpvim.vimが同梱されています。
-jpvim.vimをgqコマンドとして使用する場合はformatexprを設定してください。 >
+jpfmt.vimをgqコマンドとして使用する場合はformatexprを設定してください。 >
 
-  " gqコマンドとして使用する
-  set formatexpr=jpvim#formatexpr()
+  " 日本語対応gqコマンドとして使用する
+  set formatexpr=jpfmt#formatexpr()
 
 単にgqコマンドとしてのみ使用する場合はこれだけで動作しますので、日本語の長い行
 で gqq などとして実行してみてください。
 
 jpvim.vimはjpfmt.vimと違い、設定にかかわらず「ぶら下げ」を行いません。
-jpfmt.vimの場合は設定に依存します。
+>
+  " ぶら下げを行わない日本語対応gqコマンドとして使用する
+  set formatexpr=jpvim#formatexpr()
+
+また日本語文書への対応として行頭が 　 (全角スペース)か「 で始まった場合は段落
+開始とみなして処理を行います。
+(このためgq8jのように複数行をまとめて処理しても「で始まる行は連結されません)
+ユーザー指定の段落開始行は jpfmt_paragraph_regexp の正規表現で指定可能です。
+>
+  " 段落開始とみなす正規表現
+  let jpfmt_paragraph_regexp = '^[　「]'
+
+次章からは主に連結マーカーを利用した擬似ソフトラップを行うためのコマンド群につ
+いての解説になります。
+単にgqコマンドとしてしか使用せず、「っ」をぶら下げたくないなど禁則処理対象文字
+を変更したい場合は|jpformat_tips|, |jpformat_option_list|を参照してみてください。
 
 ==============================================================================
-3. コマンド一覧						*jpformat-command*
+3. コマンド一覧						*jpformat_command*
 
 いずれのコマンドもビジュアルモードやカウントで範囲を指定できます。
 
@@ -105,7 +133,7 @@ JpExtViewer        現バッファの内容をコピーして、連結、エン�
 す。
 
 ==============================================================================
-4. 手動整形						*jpformat-format*
+4. 手動整形						*jpformat_format*
 
 :JpFormatAll を実行すると指定範囲(デフォルトは全て)を規定の形式に整形します。
 何か一行が長い日本語文書を用意して実行してみて下さい。
@@ -170,7 +198,7 @@ formatoption は好みですが、J コマンドでの日本語を含む行の�
 い方がよいかと思います。
 
 ==============================================================================
-5. 自動整形						*jpformat-auto-format*
+5. 自動整形						*jpformat_auto_format*
 
 基本的には JpFormat と JpJoin を好みのキーにマッピングして、必要に応じて整形、
 連結を行います。
@@ -206,7 +234,7 @@ JpFormatCursorMovedI = 1 に設定すると挿入モードで一文字入力す�
 形はオフになります。
 
 ==============================================================================
-6. 整形行の連結						*jpformat-join*
+6. 整形行の連結						*jpformat_join*
 
 単に非整形状態に戻したいだけの場合は JpJoinAll を実行します。 >
   :JpJoinAll
@@ -234,7 +262,7 @@ JpFormatCursorMovedI = 1 に設定すると挿入モードで一文字入力す�
   let JpJoinEOL = '[。」！？］]'
 
 ==============================================================================
-7. 原稿枚数を計算する。					 *jpformat-count*
+7. 原稿枚数を計算する。					 *jpformat_count*
 
 :JpCountPages を実行すると現在の原稿枚数を計算できます。 >
  :JpCountPages
@@ -275,7 +303,7 @@ JpFormat.vimとは直接関係ありませんが、ステータス行に現バ�
 https://github.com/fuenor/vim-wordcount/blob/master/wordcount.vim
 
 ==============================================================================
-8. オプション						*jpformat-options*
+8. オプション						*jpformat_options*
 
 * 原稿形式(折り返し文字数等)
 
@@ -346,7 +374,7 @@ b:を付けて .vimrcで指定して下さい。 >
   au BufRead,BufNewFile *.howm let b:JpFormatExclude = '^[-+.*=|>";/[[:space:]]'
 
 ==============================================================================
-9. 整形の内部処理					*jpformat-formatexpr*
+9. 整形の内部処理					*jpformat_formatexpr*
 
 JpFormat.vimの整形処理はJpFormat.vimの「内部整形」と「|gq|」による外部コマンド
 整形との2種類から選択可能です。
@@ -462,7 +490,7 @@ JpFormatCursorMovedI = 1 で使用すると長い行では文字の取りこぼ�
 最終処理としてautofmt.vimで整形すると良いかもしれません。
 
 ==============================================================================
-10. 外部ビューアを起動する				 *jpformat-viewer*
+10. 外部ビューアを起動する				 *jpformat_viewer*
 
 JpFormat.vimで整形しながら編集しているファイルには連結マーカーや改行が埋め込ま
 れています。
@@ -537,7 +565,7 @@ EV_Tempname_txtを .vimrcで定義すると指定した名前が使用されま�
   let EV_Tempname_txt = 'evtemp'
 
 ==============================================================================
-11. Tips						 *jpformat-tips*
+11. Tips						 *jpformat_tips*
 
 "……" や "っ" などの拗促音は行頭禁則和字ですが、行頭に有ってかまわないものと
 して処理されている場合も多いので、ぶら下げないように行頭禁則(JpKinsoku)から外
@@ -568,7 +596,7 @@ txtファイルでは「」で囲まれた部分を強調表示するように�
   hi link txtDialog Special
 
 ==============================================================================
-12. オプションリスト					 *jpformat-option-list*
+12. オプションリスト					 *jpformat_option_list*
 
 禁則文字列を独自に設定したい場合は misc/kinsoku.vimをruntimepathの通った場所か
 JpFormat.vimと同じ場所へコピーして改変すると楽です。
