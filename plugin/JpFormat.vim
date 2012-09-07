@@ -1121,7 +1121,7 @@ function! JpCountPages(fline, lline, mode, ...)
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
-  if a:0 == 1 && a:1 =~ 'easy'
+  if a:mode == 1 || (a:0 == 1 && a:1 =~ 'easy')
     if JpSetAutoFormat('check')
       let lines = line('$')
       let pages = lines/b:JpCountLines + (lines % b:JpCountLines > 0)
