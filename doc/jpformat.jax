@@ -4,6 +4,7 @@
             Author: fuenor <fuenor@gmail.com>
             Web(Japanese):
             http://sites.google.com/site/fudist/Home/jpformat
+            https://github.com/fuenor/JpFormat.vim
 ==============================================================================
 
 CONTENTS					*jpformat_contents*
@@ -53,7 +54,8 @@ Vimでのメールの下書きや、青空文庫の小説などの長文を読�
 ==============================================================================
 2. インストール						*jpformat_install*
 
-jpformat.zipを解凍してできたjpfmtディレクトリにランタイムパスを通します。
+jpformat.zipまたはGitHub(https://github.com/fuenor/JpFormat.vim)からダウンロー
+ドしたzipファイルを解凍してできたディレクトリにランタイムパスを通します。
 
     1. jpformat.zipを解凍します。
     2. jpfmt というディレクトリが作成されます。
@@ -79,6 +81,7 @@ jpfmt.vimをgqコマンドとして使用する場合はformatexprを設定し�
 で gqq などとして実行してみてください。
 
 jpvim.vimはjpfmt.vimと違い、設定にかかわらず「ぶら下げ」を行いません。
+gqコマンドとしてはjpvim.vimのほうが違和感がないかもしれません。
 >
   " ぶら下げを行わない日本語対応gqコマンドとして使用する
   set formatexpr=jpvim#formatexpr()
@@ -93,8 +96,8 @@ jpvim.vimはjpfmt.vimと違い、設定にかかわらず「ぶら下げ」を�
 
 次章からは主に連結マーカーを利用した擬似ソフトラップを行うためのコマンド群につ
 いての解説になります。
-単にgqコマンドとしてしか使用せず、「っ」をぶら下げたくないなど禁則処理対象文字
-を変更したい場合は|jpformat_tips|, |jpformat_option_list|を参照してみてください。
+単にgqコマンドとしてしか使用しないけれども、禁則処理対象文字を変更したいなどの
+場合は|jpformat_tips|, |jpformat_option_list|を参照してみてください。
 
 ==============================================================================
 3. コマンド一覧						*jpformat_command*
@@ -115,8 +118,8 @@ JpYank             現在行を含むパラグラフをヤンクする
 
 JpFormatToggle     自動整形の有効/無効を切り替える。
 		   30:JpFormatToggleのようにカウント指定すると折り返し文字数が
-		   指定カウントに変更される。
-		   例えば gc など適当なキーにマップして gc や 30gcとして使う。
+		   現バッファのみ指定カウントに変更される。
+		   例えば gC など適当なキーにマップして gC や 30gCとして使う。
 JpFormatGqToggle   整形に gqコマンドを呼び出して行うかどうかを切り替える。
 
 JpCountPages       指定範囲(デフォルトは全て)のルビ等を削除した原稿枚数を計算
@@ -158,29 +161,28 @@ NOTE:デフォルトの「連結マーカー」にはタブ記号が使われて
 ルモードの指定も有効です。
 
 ------------------------------------------------------------------------------
-.vimrc でのキーマップ設定例 >
-  " 現在行を整形
-  nnoremap <silent> gl :JpFormat<CR>
-  " 現在行が整形対象外でも強制的に整形
-  nnoremap <silent> gL :JpFormat!<CR>
-
-  " 自動整形のON/OFF切替
-  " 30gc の様にカウント指定すると、
-  " 折り返し文字数を指定されたカウントに変更
-  nnoremap <silent> gc :JpFormatToggle<CR>
-
-  " カーソル位置の分割行をまとめてヤンク
-  nnoremap <silent> gY :JpYank<CR>
-  " カーソル位置の分割行をまとめて連結
-  nnoremap <silent> gJ :JpJoin<CR>
-
-  " 整形に gqを使うかどうかをトグルする
-  nnoremap <silent> gC :JpFormatGqToggle<CR>
-  " 外部ビューアを起動する
-  nnoremap <silent> <F8> :JpExtViewer<CR>
-
+.vimrc でのキーマップ設定例
+>
   " 日本語の行の連結時には空白を入力しない。
   set formatoptions+=mM
+
+  " 現在行を整形
+  noremap <silent> gl :JpFormat<CR>
+  " 現在行が整形対象外でも強制的に整形
+  noremap <silent> gL :JpFormat!<CR>
+
+  " 自動整形のON/OFF切替
+  " 30gC の様にカウント指定すると、
+  " 現バッファのみ折り返し文字数を指定されたカウントに変更
+  nnoremap <silent> gC :JpFormatToggle<CR>
+
+  " カーソル位置の分割行をまとめてヤンク
+  noremap <silent> gY :JpYank<CR>
+  " カーソル位置の分割行をまとめて連結
+  noremap <silent> gJ :JpJoin<CR>
+
+  " 外部ビューアを起動する
+  nnoremap <silent> <F8> :JpExtViewer<CR>
 
 この例だと gl で整形することになります。
 コマンドは 3gl の用にカウント指定や、ビジュアルモードで範囲を指定可能です。
@@ -230,8 +232,9 @@ JpFormatCursorMovedI = 1 に設定すると挿入モードで一文字入力す�
   " txtファイルで「連結マーカー+改行」が有ったら自動整形を有効にする
   au BufRead *.txt  silent! call JpSetAutoFormat()
 
-バッファローカルなオプション b:jpformat = 0 に設定してもそのバッファのみ自動整
-形はオフになります。
+自動整形自体は :JpFormatToggleを実行してON/OFF切替可能ですが、バッファローカル
+なオプション b:jpformat = 0 に設定してもそのバッファのみ自動整形はオフになりま
+す。
 
 ==============================================================================
 6. 整形行の連結						*jpformat_join*
@@ -268,16 +271,17 @@ JpFormatCursorMovedI = 1 に設定すると挿入モードで一文字入力す�
  :JpCountPages
 
 計算する際にはルビや制御用スクリプトを削除した、実際の原稿枚数を計算します。
-:JpCountPages! として ! を付けて実行すると、指定範囲(デフォルトは全て)が整形結
-果に置き換えられます。 >
+>
   " 原稿用紙換算計算時に削除するルビ等の正規表現
   let JpCountDeleteReg = '\[[^]]\+\]\|<[^>]\+>\|《[^》]\+》\|［[^］]\+］\|｜'
 
 現在の縦文字数や行数と異なるページ数をカウントしたい場合は、JpCountPages実行時
 に文字数と行数を指定します。
+>
   JpCountPages [折り返し文字数] [行数] {ぶら下がり文字数}
+<
+  行数、ぶら下がり文字数は省略可能です。
 
-行数、ぶら下がり文字数は省略可能です。
 現在40×17フォーマットで整形していて、20×20フォーマットのページ数を知りたい場
 合は次のように実行します。 >
   :JpCountPages 20 20
@@ -289,11 +293,17 @@ JpFormatCursorMovedI = 1 に設定すると挿入モードで一文字入力す�
 かかります。
 概算でかまわないような場合、整形済みの文書では簡易的に行数から原稿枚数計算を行
 う事が出来ます。
+>
+  :JpCountPages!
+
 Easyモードではルビ等も通常の文字と見なされますが、ルビ等の制御記号を使用してい
 なければ正確な枚数表示がなされます。 >
-  :JpCountPages Easy
-
 文書内に連結マーカーが存在しない場合は通常通り JpCountPagesが実行されます。
+
+JpCountPagesは適当なキーにマップして使用すると良いかもしれません。
+>
+  " 現在の原稿枚数計算(簡易)
+  noremap <silent> gc :JpCountPages!<CR>
 
 ------------------------------------------------------------------------------
 * リアルタイムに文字数を確認する
@@ -323,6 +333,15 @@ https://github.com/fuenor/vim-wordcount/blob/master/wordcount.vim
 たとえば一行あたりの文字数を変更したい場合は、コマンドモードから次のように指定
 します。 >
   :let b:JpCountChars=30
+
+また通常 :JpFormatToggleは自動整形のON/OFFを切り替えるために使用しますが、カウ
+ント指定した場合はON/OFF切り替えではなく指定カウントをそのバッファの折り返し文
+字数に設定します。
+>
+  :30JpFormatToggle
+<
+  これは :let b:JpCountChars=30と同等の結果になります。
+  JpFormatToggleをキーマップしておいて使用すると便利かもしれません。
 
 特定拡張子や特定ファイルで個別の文字数で折り返したい時は.vimrcで次のように設定します。 >
   " 拡張子howmの折り返し文字数は30文字
@@ -465,10 +484,11 @@ NOTE:Vimのデフォルトで使用されるgqコマンドは日本語に対応�
   " 段落開始とみなす正規表現
   let jpfmt_paragraph_regexp = '^[　「]'
 
-gqコマンドとしても使用する場合は|formatexpr|を設定します。 >
-
-  " gqコマンドとして使用する
-  set formatexpr=jpfmt#formatexpr()
+jpfmt#formatexpr()の動作は JpFormat.vimの設定に依存し、「ぶら下げ」処理も行い
+ますが、「ぶら下げ」処理が不要な場合は jpvim#formatexpr()を使用してください。
+>
+  " 「ぶら下げ」を行わないjpvim.vimをJpFormat.vimの整形コマンドとして使用する
+  let JpFormat_formatexpr = 'jpvim#formatexpr()'
 
 ------------------------------------------------------------------------------
 * autofmt.vim
