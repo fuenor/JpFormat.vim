@@ -1013,9 +1013,9 @@ function! JpFormatStr(str, clidx, ...)
         let ofs = 0
         if s:strdisplaywidth(str) > chars+ochars+ofs
           let ostr = matchstr(str, '.'.g:JpKinsoku.'*'.JpKinsokuO.'\+$')
-          if ostr =~ '^[[:print]]'
-            let ostr = matchstr(ostr, '^.\zs.*')
-          endif
+          " if ostr =~ '^[[:print:]]'
+          "   let ostr = matchstr(ostr, '^.\zs.*')
+          " endif
           let str = strpart(str, 0, strlen(str)-strlen(ostr))
           let lstr = ostr.lstr
 
