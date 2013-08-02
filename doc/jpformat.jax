@@ -1,4 +1,4 @@
-*jpformat.jax*	For Vim バージョン 7.2	Last change: 2012 September 8
+*jpformat.jax*	For Vim バージョン 7.2	Last change: 2013 August 2
 ==============================================================================
        Description: JpFormat.vim 日本語整形プラグイン
             Author: fuenor <fuenor@gmail.com>
@@ -378,11 +378,11 @@ b:JpFormatExclude が使用されます。
 以下のように設定すると半角文字だけの行なら整形しません。 >
   " 整形対象外の正規表現(空文字 か'^$' を指定すると全ての行が整形対象)
   " 半角だけの行は整形しない
-  let JpFormatExclude = '^[^[[:print:][:space:]]\+$'
+  let JpFormatExclude = '^[^[\x00-\xff]]\+$'
 
 行頭が日本語以外は対象外にしたい場合は以下のようにします。 >
   " 日本語以外で始まった場合は整形しない
-  let JpFormatExclude = '^[[:print:][:space:]]'
+  let JpFormatExclude = '^[\x00-\xff]'
 
 gqなどの整形コマンドや他の整形プラグインを併用したい場合、使用したい行を対象外
 に設定して使用してください。

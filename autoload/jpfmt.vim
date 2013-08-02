@@ -390,8 +390,7 @@ function! s:lib.format_lines(lnum, count)
   endif
   let lines = getline(lnum, lnum + a:count - 1)
   if jpfmt_compat == 1
-    " if join(lines, '') !~ '[^[:print:][:space:]]'
-    if s:count(lines, '[^[:print:][:space:]]') == 0
+    if s:count(lines, '[^\x00-\xff]') == 0
       let l = self.vimformatexpr(lnum, a:count, tw)
       return line('$') - prev_lines
     elseif a:count == 1 && s:strdisplaywidth(getline(lnum)) <= tw
@@ -436,7 +435,7 @@ function! s:lib.format_lines(lnum, count)
         let line2 = glist[i]
         let line2 = substitute(line2[llen :], '^\s*', '', '')
         " 分割位置が日本語の行までJpFormatの整形を使用
-        if line1 =~ '[^[:print:]]$' || line2 =~ '^[^[:print:]]'
+        if line1 =~ '[^\x00-\xff]$' || line2 =~ '^[^\x00-\xff]'
           let idx += 1
         else
           break

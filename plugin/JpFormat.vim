@@ -4,7 +4,7 @@
 "                 http://sites.google.com/site/fudist/Home/jpformat
 "=============================================================================
 scriptencoding utf-8
-let s:version = 121
+let s:version = 122
 
 if exists('disable_JpFormat') && disable_JpFormat
   finish
@@ -1013,14 +1013,14 @@ function! JpFormatStr(str, clidx, ...)
         let ofs = 0
         if s:strdisplaywidth(str) > chars+ochars+ofs
           let ostr = matchstr(str, '.'.g:JpKinsoku.'*'.JpKinsokuO.'\+$')
-          " if ostr =~ '^[[:print:]]'
+          " if ostr =~ '^[\x00-\xff]'
           "   let ostr = matchstr(ostr, '^.\zs.*')
           " endif
           let str = strpart(str, 0, strlen(str)-strlen(ostr))
           let lstr = ostr.lstr
 
           " 行末禁則文字を全て次行へ移動
-          if str !~ '[[:print:]]$' && str =~ g:JpKinsokuE.'\+$'
+          if str !~ '[\x00-\xff]$' && str =~ g:JpKinsokuE.'\+$'
             let ostr = matchstr(str, g:JpKinsokuE.'\+$')
             let str = strpart(str, 0, strlen(str)-strlen(ostr))
             let lstr = ostr.lstr
