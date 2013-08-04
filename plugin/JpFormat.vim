@@ -4,7 +4,7 @@
 "                 http://sites.google.com/site/fudist/Home/jpformat
 "=============================================================================
 scriptencoding utf-8
-let s:version = 122
+let s:version = 123
 
 if exists('disable_JpFormat') && disable_JpFormat
   finish
@@ -69,6 +69,7 @@ if !exists('JpFormatCursorMovedI_BS')
   let JpFormatCursorMovedI_BS = 1
 endif
 " 挿入モードへ移行したら自動連結
+" (JpFormatCursorMovedI=0の時のみ有効)
 "  1 : カーソル位置以降を自動連結
 "  2 : パラグラフを自動連結
 if !exists('JpAutoJoin')
@@ -94,18 +95,10 @@ if !exists('JpFormat_iformatexpr')
   let g:JpFormat_iformatexpr = ''
 endif
 
-function! JpFormatKinsokuReg(str)
-  let str = a:str
-  if str =~ '^\[.*\]$'
-    return str
-  endif
-  return '['.escape(str, ']').']'
-endfunction
-
 " 基本的な処理方法
 " 1. まず指定文字数に行を分割
-" 2. 次行の行頭禁則文字を現在行へ移動
-" 3. 現在行の行末禁則文字を次行へ移動
+" 2. 次行の行頭禁則文字(JpKinsoku)を現在行へ移動
+" 3. 現在行の行末禁則文字(JpKinsokuE)を次行へ移動
 " 4. ぶら下がり文字数を超えてぶら下がっていたら追い出し
 
 " 行頭禁則
@@ -192,44 +185,89 @@ if !exists('JpJoinTOL')
   let JpJoinTOL = '[\s　「・＊]'
 endif
 
-" Jコマンド代替
-if (!exists('JpAltJ') || JpAltJ) && JpFormatMarker != ''
-  nnoremap <silent> J :<C-u>JpAltJ<CR>
-  vnoremap <silent> J :call JpAltJ()<CR>
-endif
-
-" C-v代替
-if (!exists('JpAltCv') || JpAltCv)
-  nnoremap <silent> <expr> <C-v> JpAltCv()
-endif
-" gq実行時にJpFormatをオフにする
-" if (exists('JpAltgq') && JpAltgq) || (!exists('JpAltgq') && has('Kaoriya') && !exists('plugin_format_disable'))
-if (exists('JpAltgq') && JpAltgq)
-  " nnoremap <silent> <expr> gq JpFormat_cmd("gq")
-endif
-
-" DELコマンド代替
-if (exists('JpAltDEL') && JpAltDEL) && JpFormatMarker != '' && JpFormatCursorMovedI
-  inoremap <silent> <expr> <DEL> "<C-r>=JpAltDEL()<CR>"
-endif
-
-function! JpFormatChk()
-  return (!exists('b:jpformat') || b:jpformat == 0 || g:JpFormatMarker != '')
-endfunction
-
-" <C-v>コマンド代替
-command! -range JpAltCv call JpAltCv(<line1>, <line2>)
-function! JpAltCv(...)
-  if exists('b:jpformat')
-    let b:jpformat = b:jpformat == 0 ? 0 : -1
-  endif
-  return "\<C-v>"
-endfunction
+" 原稿用紙換算
+command! -bang -range=% -nargs=* JpCountPages     call s:JpCountPages(<line1>, <line2>, <bang>0, <f-args>)
+" 指定範囲から指定範囲最終行を含むパラグラフ最終行まで整形
+" 範囲未指定時は現在行からパラグラフ最終行まで整形
+command! -bang -range -nargs=*   JpFormat         call s:JpFormat(<line1>, <line2>, <bang>0, <f-args>)
+" パラグラフをフォーマット
+command! -bang -range            JpFormatP        call s:JpFormatP(<line1>, <line2>, <bang>0)
+" 全文整形
+command! -bang -range=% -nargs=* JpFormatAll      call s:JpFormatAll(<line1>, <line2>, <bang>0, <f-args>)
+" 指定範囲から指定範囲最終行を含むパラグラフ最終行まで連結
+command! -bang -range            JpJoin           call s:JpJoin(<line1>, <line2>, <bang>0)
+" 全文連結
+command! -bang -range=%          JpJoinAll        call s:JpJoinAll(<line1>, <line2>, <bang>0)
+" 現在行を含むパラグラフを連結してからヤンク
+command! -bang -range            JpYank           call s:JpYank(<line1>, <line2>, <bang>0)
+" 自動整形をトグル
+command! -count                  JpFormatToggle   call s:JpFormatToggle()
+" gqモードをトグル
+command!                         JpFormatGqToggle call s:JpFormatGqToggle()
+" マーカーが存在するなら自動整形をON
+command!                         JpSetAutoFormat  call JpSetAutoFormat()
 
 " コマンド実行時にJpFormatをオフにする代替コマンド
 function! JpFormat_cmd(cmd)
   let b:jpformat = 0
   return a:cmd
+endfunction
+
+let s:debug = 0
+if exists('g:fudist')
+  let s:debug = g:fudist
+endif
+
+" J代替
+if (!exists('JpAltJ') || JpAltJ) && JpFormatMarker != ''
+  nnoremap <silent> J :<C-u>call JpAltJ()<CR>
+  vnoremap <silent> J :call JpAltJ()<CR>
+endif
+
+" <C-v>代替
+if (!exists('JpAltCv') || JpAltCv)
+  nnoremap <silent> <expr> <C-v> JpAltCv()
+endif
+
+" <DEL>代替(デフォルト無効)
+if (exists('JpAltDEL') && JpAltDEL) && JpFormatMarker != '' && JpFormatCursorMovedI
+  inoremap <silent> <expr> <DEL> "<C-r>=JpAltDEL()<CR>"
+endif
+
+" J コマンド代替
+function! JpAltJ() range
+  let cnt = count
+  let fline = a:firstline
+  let lline = a:lastline
+  if count
+    let lline = lline + count - 1
+  endif
+  if fline != lline
+    let cnt = lline-fline+1
+  endif
+  if exists('b:jpformat') && b:jpformat == 1 && g:JpFormatMarker != ''
+    let save_cursor = getpos(".")
+    let l:JpFormatExclude = b:JpFormatExclude
+    let glist = getline(fline, lline)
+    let lines = lline - fline - 1
+    let lines = lines > 0 ? lines : 0
+    for i in range(0, lines)
+      if glist[i] != l:JpFormatExclude
+        let glist[i] = substitute(glist[i], g:JpFormatMarker.'$', '', '')
+      endif
+    endfor
+    call setline(fline, glist)
+    call setpos('.', save_cursor)
+  endif
+  exe 'normal! '.cnt.'J'
+endfunction
+
+" <C-v>コマンド代替
+function! JpAltCv(...)
+  if exists('b:jpformat')
+    let b:jpformat = b:jpformat == 0 ? 0 : -1
+  endif
+  return "\<C-v>"
 endfunction
 
 " DELコマンド代替
@@ -253,52 +291,6 @@ function! JpAltDEL(...)
   return ''
 endfunction
 
-" 原稿用紙換算
-command! -bang -range=% -nargs=* JpCountPages call JpCountPages(<line1>, <line2>, <bang>0, <f-args>)
-" 指定範囲と指定範囲最終行を含むパラグラフを整形
-" 範囲未指定時は現在行から整形
-command! -bang -range -nargs=* JpFormat call JpFormat(<line1>, <line2>, <bang>0, <f-args>)
-" パラグラフをフォーマット
-command! -bang -range JpFormatP call JpFormatP(<line1>, <line2>, <bang>0)
-" 全文整形
-command! -bang -range=% -nargs=* JpFormatAll call JpFormatAll(<line1>, <line2>, <bang>0, <f-args>)
-" 指定範囲のパラグラフを連結
-command! -bang -range JpJoin call JpJoin(<line1>, <line2>, <bang>0)
-" 全文連結
-command! -bang -range=% JpJoinAll call JpJoinAll(<line1>, <line2>, <bang>0)
-" 現在行を連結してからヤンク
-command! -bang -range JpYank call JpYank(<line1>, <line2>, <bang>0)
-" 自動整形をトグル
-command! -count JpFormatToggle call JpFormatToggle()
-" gqモードをトグル
-command! JpFormatGqToggle call JpFormatGqToggle()
-
-function! JpFormatToggle()
-  if count > 0
-    let b:JpCountChars = count
-    echo 'JpFormat : Chars = '.b:JpCountChars
-    return
-  endif
-  let b:jpformat = !b:jpformat
-  echo 'JpFormat : '. (b:jpformat ? 'ON' : 'OFF')
-endfunction
-
-function! JpFormatGqToggle()
-  let b:JpFormatGqMode = !b:JpFormatGqMode
-  echo 'JpFormat : '. (b:JpFormatGqMode ? '(gq)' : '(normal)')
-endfunction
-
-augroup JpFormat_
-  au!
-  " 挿入モードから抜けると自動整形
-  au InsertEnter        * call JpFormatEnter()
-  au InsertLeave        * call JpFormatLeave()
-  au VimEnter           * call JpFormatInit()
-  au BufNew,BufWinEnter * call JpFormatInit()
-  au BufNewFile,BufRead * call JpFormatInit()
-  au CursorMovedI       * call JpFormatCursorMovedI_()
-augroup END
-
 if JpKinsoku == ''
   let JpKinsoku = '[]'
 endif
@@ -315,18 +307,18 @@ if JpJoinTOL == ''
   let JpJoinTOL = '[]'
 endif
 
-let s:debug = 0
-if exists('g:fudist')
-  let s:debug = g:fudist
-endif
+augroup JpFormat_
+  au!
+  " 挿入モードから抜けると自動整形
+  au VimEnter           * call s:JpFormatInit()
+  au BufNew,BufWinEnter * call s:JpFormatInit()
+  au BufNewFile,BufRead * call s:JpFormatInit()
+  au InsertEnter        * call s:JpFormatEnter()
+  au InsertLeave        * call s:JpFormatLeave()
+  au CursorMovedI       * call s:JpFormatCursorMovedI_()
+augroup END
 
-if JpAutoJoin == 3
-  silent! nnoremap <silent> i i<C-g>u
-  silent! nnoremap <silent> I I<C-g>u
-  silent! nnoremap <silent> a a<C-g>u
-endif
-
-function! JpFormatInit()
+function! s:JpFormatInit()
   if !exists('b:jpformat')
     let b:jpformat = 0
   endif
@@ -365,50 +357,7 @@ function! JpFormatInit()
   endif
 endfunction
 
-function! JpFormatCursorMovedI_()
-  if !exists('b:jpformat')
-    let b:jpformat=0
-  endif
-  if g:JpFormatCursorMovedI == 0 || b:jpformat <= 0 || g:JpFormatMarker == ''
-    return
-  endif
-  if exists('*JpFormatCursorMovedI')
-    call JpFormatCursorMovedI()
-    return
-  endif
-  let altch = b:jpf_pmarker && line('.') == b:jpf_pline - 1 && b:jpf_pcol == 1 && col('.') != col('$')
-  if (exists('JpAltBS') && JpAltBS==0)
-    let altch = 0
-  endif
-  if altch
-    call feedkeys("\<C-h>", 'n')
-    if g:JpFormatCursorMovedI_BS
-      call feedkeys("\<C-h>", 'n')
-    endif
-  elseif b:JpFormatGqMode
-    call JpFormatGq(line('.'), line('.'), 0)
-  else
-    if getline('.') =~ '^\s\+' && g:JpFormatIndent == 2
-      let saved_fex=g:JpFormat_formatexpr
-      let g:JpFormat_formatexpr = 'jpcpt#formatexpr()'
-      if g:JpFormat_iformatexpr != ''
-        let g:JpFormat_formatexpr = g:JpFormat_iformatexpr
-      endif
-      call JpFormatGq(line('.'), line('.'), 0)
-      let g:JpFormat_formatexpr=saved_fex
-    else
-      call JpFormat(line('.'), line('.'), 0)
-    endif
-  endif
-  let b:jpf_pline = line('.')
-  let b:jpf_pcol  = col('.')
-  let b:jpf_pmarker = getline(b:jpf_pline-1) =~ g:JpFormatMarker."$"
-  if g:JpFormatMarker == ''
-    let b:jpf_pmarker = 0
-  endif
-endfunction
-
-silent! function JpFormatEnter()
+function! s:JpFormatEnter()
   if !exists('b:jpformat')
     let b:jpformat = 0
   endif
@@ -450,22 +399,22 @@ silent! function JpFormatEnter()
       if g:JpFormatCursorMovedI
         "
       elseif b:JpFormatGqMode
-        call JpJoinGq(fline, lline, 0)
+        call s:JpJoinGq(fline, lline, 0)
       else
-        let lines = JpJoinExec(fline, lline)
+        let lines = s:JpJoinExec(fline, lline)
       endif
     elseif l:JpAutoJoin == 2
       if b:JpFormatGqMode
-        call JpJoinGq(fline, lline, 0)
+        call s:JpJoinGq(fline, lline, 0)
       else
-        call JpJoin(fline, lline)
+        call s:JpJoin(fline, lline)
         let b:jpf_sline = line('.')
       endif
     endif
   endif
 endfunction
 
-silent! function JpFormatLeave()
+function! s:JpFormatLeave()
   if !exists('b:jpformat')
     let b:jpformat = 0
   endif
@@ -478,7 +427,7 @@ silent! function JpFormatLeave()
     return
   endif
   if b:jpformat > 0
-    call JpFormatInsertLeave()
+    call s:JpFormatInsertLeave()
   endif
   let l:JpAutoJoin = g:JpAutoJoin
   if l:JpAutoJoin
@@ -500,8 +449,105 @@ silent! function JpFormatLeave()
   silent! exec 'setlocal backspace='.b:jpf_saved_bs
 endfunction
 
+function! s:JpFormatInsertLeave()
+  if b:jpformat == 0
+    return
+  endif
+  if exists('*JpFormatInsert')
+    call JpFormatInsert()
+    return
+  endif
+  let fline = line('.')
+  let lline = line('.')
+  if fline > b:jpf_sline
+    let fline = b:jpf_sline
+  endif
+  if lline < b:jpf_sline
+    let lline = b:jpf_sline
+  endif
+
+  if b:JpFormatGqMode
+    call s:JpFormatGq(line('.'), lline, 0)
+  elseif g:JpFormatCursorMovedI == 0 && g:JpFormatIndent == 2
+    let saved_fex=g:JpFormat_formatexpr
+    let g:JpFormat_formatexpr = 'jpfmt#formatexpr()'
+    if g:JpFormat_iformatexpr != ''
+      let g:JpFormat_formatexpr = g:JpFormat_iformatexpr
+    endif
+    call s:JpFormatGq(line('.'), lline, 0)
+    let g:JpFormat_formatexpr=saved_fex
+  else
+    let cline = s:JpFormatExec(fline, lline)
+  endif
+endfunction
+
+function! s:JpFormatCursorMovedI_()
+  if !exists('b:jpformat')
+    let b:jpformat=0
+  endif
+  if g:JpFormatCursorMovedI == 0 || b:jpformat <= 0 || g:JpFormatMarker == ''
+    return
+  endif
+  if exists('*JpFormatCursorMovedI')
+    call JpFormatCursorMovedI()
+    return
+  endif
+  let altch = b:jpf_pmarker && line('.') == b:jpf_pline - 1 && b:jpf_pcol == 1 && col('.') != col('$')
+  if (exists('JpAltBS') && JpAltBS==0)
+    let altch = 0
+  endif
+  if altch
+    call feedkeys("\<C-h>", 'n')
+    if g:JpFormatCursorMovedI_BS
+      call feedkeys("\<C-h>", 'n')
+    endif
+  elseif b:JpFormatGqMode
+    call s:JpFormatGq(line('.'), line('.'), 0)
+  else
+    if getline('.') =~ '^\s\+' && g:JpFormatIndent == 2
+      let saved_fex=g:JpFormat_formatexpr
+      let g:JpFormat_formatexpr = 'jpcpt#formatexpr()'
+      if g:JpFormat_iformatexpr != ''
+        let g:JpFormat_formatexpr = g:JpFormat_iformatexpr
+      endif
+      call s:JpFormatGq(line('.'), line('.'), 0)
+      let g:JpFormat_formatexpr=saved_fex
+    else
+      call s:JpFormat(line('.'), line('.'), 0)
+    endif
+  endif
+  let b:jpf_pline = line('.')
+  let b:jpf_pcol  = col('.')
+  let b:jpf_pmarker = getline(b:jpf_pline-1) =~ g:JpFormatMarker."$"
+  if g:JpFormatMarker == ''
+    let b:jpf_pmarker = 0
+  endif
+endfunction
+
+function! JpSetAutoFormat(...)
+  call s:JpFormatInit()
+
+  let save_cursor = getpos(".")
+  call cursor(1, 1)
+  let sl = search(g:JpFormatMarker."$", 'cW')
+  while 1
+    if sl == 0
+      break
+    endif
+    if getline('.') !~ b:JpFormatExclude
+      break
+    endif
+    let sl = search(g:JpFormatMarker."$", 'W')
+  endwhile
+  call setpos('.', save_cursor)
+  if a:0 == 0
+    let b:jpformat = sl != 0 ? 1 : 0
+  endif
+  return sl
+endfunction
+
 " 指定範囲以降を整形
-function! JpFormat(fline, lline, mode, ...)
+function! s:JpFormat(fline, lline, mode, ...)
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
@@ -519,15 +565,15 @@ function! JpFormat(fline, lline, mode, ...)
     let b:JpFormatExclude = '^$'
   endif
   if b:JpFormatGqMode
-    call JpFormatGq(a:fline, a:lline, 0)
+    call s:JpFormatGq(a:fline, a:lline, 0)
   else
-    call JpFormatExec(a:fline, a:lline)
+    call s:JpFormatExec(a:fline, a:lline)
   endif
   let b:JpFormatExclude = exclude
 endfunction
 
 " 全文整形
-function! JpFormatAll(fline, lline, mode, ...)
+function! s:JpFormatAll(fline, lline, mode, ...)
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
@@ -553,9 +599,9 @@ function! JpFormatAll(fline, lline, mode, ...)
   endif
   if b:JpFormatGqMode
     " redraw|echo 'JpFormat(gq) : Restore to its original state...'
-    " call JpJoin(1, line('$'))
+    " call s:JpJoin(1, line('$'))
     redraw|echo 'JpFormat(gq) : Formatting...'
-    call JpFormatGq(fline, lline, 1)
+    call s:JpFormatGq(fline, lline, 1)
     if a:mode
      " " マーカーを削除
      " for n in range(fline, lline)
@@ -619,7 +665,7 @@ function! JpFormatAll(fline, lline, mode, ...)
 endfunction
 
 " パラグラフをフォーマット
-function! JpFormatP(fline, lline, mode)
+function! s:JpFormatP(fline, lline, mode)
   if b:jpformat == 0
     return
   endif
@@ -644,26 +690,26 @@ function! JpFormatP(fline, lline, mode)
   let lline = lline == 0 ? line('$') : lline
   call setpos('.', save_cursor)
   if b:JpFormatGqMode
-    call JpFormatGq(fline, lline, 1)
+    call s:JpFormatGq(fline, lline, 1)
   else
-    call JpFormatExec(fline, lline)
+    call s:JpFormatExec(fline, lline)
   endif
   let b:JpFormatExclude = exclude
 endfunction
 
-function! JpJoinAll(fline, lline, ...)
+function! s:JpJoinAll(fline, lline, ...)
   let mode = ''
   if b:JpFormatGqMode
     let mode = '(gq)'
   endif
   redraw|echo 'JpJoin'.mode.' : Processing...'
   let start = reltime()
-  call JpJoin(a:fline, a:lline)
+  call s:JpJoin(a:fline, a:lline)
   redraw|echo 'JpJoin'.mode.' : Done. ('. reltimestr(reltime(start)) . ' sec )'
 endfunction
 
 " 指定範囲のパラグラフを連結
-function! JpJoin(fline, lline, ...)
+function! s:JpJoin(fline, lline, ...)
   let save_cursor = getpos(".")
   let fline = a:fline
   let lline = a:lline
@@ -683,15 +729,15 @@ function! JpJoin(fline, lline, ...)
   let lline = lline == 0 ? line('$') : lline
   call setpos('.', save_cursor)
   if b:JpFormatGqMode
-    call JpJoinGq(fline, lline, 1)
+    call s:JpJoinGq(fline, lline, 1)
   else
-    call JpJoinExec(fline, lline)
+    call s:JpJoinExec(fline, lline)
   endif
   let g:JpFormatMarker = saved_marker
 endfunction
 
 " 現在行のパラグラフをヤンク
-function! JpYank(fline, lline, ...)
+function! s:JpYank(fline, lline, ...)
   let save_cursor = getpos(".")
   let fline = a:fline
   let lline = a:lline
@@ -723,7 +769,7 @@ function! s:setline(glist, fline, lline)
 endfunction
 
 " 指定範囲を整形
-function! JpFormatExec(fline, lline)
+function! s:JpFormatExec(fline, lline)
   let start = reltime()
 
   let fline = a:fline
@@ -754,7 +800,7 @@ function! JpFormatExec(fline, lline)
 endfunction
 
 " 指定範囲を連結
-function! JpJoinExec(fline, lline)
+function! s:JpJoinExec(fline, lline)
   let start = reltime()
   let fline = a:fline
   let lline = a:lline
@@ -776,7 +822,7 @@ function! JpJoinExec(fline, lline)
   return (lline-fline+1)
 endfunction
 
-" リストを連結
+" 指定範囲を連結したリストを返す
 function! JpJoinStr(fline, lline, ...)
   let fline = a:fline
   let lline = a:lline
@@ -1083,41 +1129,8 @@ function! s:getdwstr(lstr, chars, leader)
   return str
 endfunction
 
-" 挿入モード後に自動整形
-silent! function JpFormatInsertLeave()
-  if b:jpformat == 0
-    return
-  endif
-  if exists('*JpFormatInsert')
-    call JpFormatInsert()
-    return
-  endif
-  let fline = line('.')
-  let lline = line('.')
-  if fline > b:jpf_sline
-    let fline = b:jpf_sline
-  endif
-  if lline < b:jpf_sline
-    let lline = b:jpf_sline
-  endif
-
-  if b:JpFormatGqMode
-    call JpFormatGq(line('.'), lline, 0)
-  elseif g:JpFormatCursorMovedI == 0 && g:JpFormatIndent == 2
-    let saved_fex=g:JpFormat_formatexpr
-    let g:JpFormat_formatexpr = 'jpfmt#formatexpr()'
-    if g:JpFormat_iformatexpr != ''
-      let g:JpFormat_formatexpr = g:JpFormat_iformatexpr
-    endif
-    call JpFormatGq(line('.'), lline, 0)
-    let g:JpFormat_formatexpr=saved_fex
-  else
-    let cline = JpFormatExec(fline, lline)
-  endif
-endfunction
-
 " 原稿用紙換算
-function! JpCountPages(fline, lline, mode, ...)
+function! s:JpCountPages(fline, lline, mode, ...)
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
@@ -1183,64 +1196,26 @@ function! JpCountPages(fline, lline, mode, ...)
   call cursor(fline, 1)
 endfunction
 
-" J コマンド代替
-command! -count JpAltJ call JpAltJ()
-function! JpAltJ() range
-  let cnt = count
-  let fline = a:firstline
-  let lline = a:lastline
-  if count
-    let lline = lline + count - 1
+function! s:JpFormatToggle()
+  if count > 0
+    let b:JpCountChars = count
+    echo 'JpFormat : Chars = '.b:JpCountChars
+    return
   endif
-  if fline != lline
-    let cnt = lline-fline+1
-  endif
-  if exists('b:jpformat') && b:jpformat == 1 && g:JpFormatMarker != ''
-    let save_cursor = getpos(".")
-    let l:JpFormatExclude = b:JpFormatExclude
-    let glist = getline(fline, lline)
-    let lines = lline - fline - 1
-    let lines = lines > 0 ? lines : 0
-    for i in range(0, lines)
-      if glist[i] != l:JpFormatExclude
-        let glist[i] = substitute(glist[i], g:JpFormatMarker.'$', '', '')
-      endif
-    endfor
-    call setline(fline, glist)
-    call setpos('.', save_cursor)
-  endif
-  exe 'normal! '.cnt.'J'
+  let b:jpformat = !b:jpformat
+  echo 'JpFormat : '. (b:jpformat ? 'ON' : 'OFF')
 endfunction
 
-" マーカーが存在するなら自動整形をON
-" au BufRead *.txt call JpSetAutoFormat()
-function! JpSetAutoFormat(...)
-  call JpFormatInit()
-
-  let save_cursor = getpos(".")
-  call cursor(1, 1)
-  let sl = search(g:JpFormatMarker."$", 'cW')
-  while 1
-    if sl == 0
-      break
-    endif
-    if getline('.') !~ b:JpFormatExclude
-      break
-    endif
-    let sl = search(g:JpFormatMarker."$", 'W')
-  endwhile
-  call setpos('.', save_cursor)
-  if a:0 == 0
-    let b:jpformat = sl != 0 ? 1 : 0
-  endif
-  return sl
+function! s:JpFormatGqToggle()
+  let b:JpFormatGqMode = !b:JpFormatGqMode
+  echo 'JpFormat : '. (b:JpFormatGqMode ? '(gq)' : '(normal)')
 endfunction
 
 "=============================================================================
 "  Description: gqを使用したJpFormat形式の整形
 "=============================================================================
-command! -bang -range JpFormatGq call JpFormatGq(<line1>, <line2>, <bang>0)
-function!  JpFormatGq(fline, lline, mode, ...)
+command! -bang -range JpFormatGq call s:JpFormatGq(<line1>, <line2>, <bang>0)
+function! s:JpFormatGq(fline, lline, mode, ...)
   call JpFormatGqPre()
 
   let b:jpformat = 1
@@ -1415,8 +1390,8 @@ function! s:InsertPointgq(glist, cstr)
   return idx
 endfunction
 
-function! JpJoinGq(fline, lline, mode)
-  call JpFormatGq(a:fline, a:lline, a:mode, 'join')
+function! s:JpJoinGq(fline, lline, mode)
+  call s:JpFormatGq(a:fline, a:lline, a:mode, 'join')
 endfunction
 
 "=============================================================================
@@ -1449,8 +1424,8 @@ endif
 "    Description: 外部ビューア呼び出し
 "     Maintainer: fuenor@gmail.com
 "                 http://sites.google.com/site/fudist/Home/extviewer
-"  Last Modified: 2009-11-08 18:00
-"        Version: 1.00
+"  Last Modified: 2013-08-02 18:00
+"        Version: 1.01
 "=============================================================================
 if exists("loaded_ExtViewer") && !exists('fudist')
   finish
@@ -1478,100 +1453,26 @@ if !exists('EV_JoinStr')
 endif
 " ビューア一ページあたりの行数
 if !exists('EV_CountLines')
-  let EV_CountLines = 16
+  let EV_CountLines = 17
 endif
 
 " JpFormat.vimを使用している時にマーカーを削除する
 if !exists('EV_RemoveMarker')
   let EV_RemoveMarker = 0
 endif
-" Windows?
-let s:MSWindows = has('win95') + has('win16') + has('win32') + has('win64')
-let s:tmpname = tempname()
 
 " 外部ビューア起動
-command! -nargs=* -range=% -bang ExtViewer call ExtViewer(<bang>0, <line1>, <line2>, <f-args>)
-command! -nargs=* -range=% -bang JpExtViewer call ExtViewer(<bang>0, <line1>, <line2>, 'txt')
-function! ExtViewer(mode, fline, lline, ...)
-  let fline = a:fline
-  let lline = a:lline
-  let file = ''
-  let line = 0
-  let suffix = ''
+command! -nargs=* -range=% -bang ExtViewer   call s:ExtViewer(<bang>0, <line1>, <line2>, <f-args>)
+command! -nargs=* -range=% -bang JpExtViewer call s:ExtViewer(<bang>0, <line1>, <line2>, 'txt')
+command! -count                  EVJumpPage  silent! exec 'normal! '.((count-1)*g:EV_CountLines).'gg'
 
-  if a:0
-    let suffix = a:1
-  endif
-  if suffix == ''
-    let suffix = expand("%:e")
-  endif
-  if suffix == 'howm' || suffix == 'nvl'
-    let suffix = expand("txt")
-  endif
-  if a:mode == 0
-    if exists('g:EV_Tempname_'.suffix)
-      exec 'let s:tmpname = '. 'g:'.'EV_Tempname_'.suffix
-    endif
-    let s:tmpname = fnamemodify(s:tmpname, ":r") .'.'.suffix
-    let file = s:tmpname
-  else
-    let file = expand('%:p')
-  endif
-  if line == 0
-    let line = line('.')
-    if fline != 1 || lline != line('$')
-      let line = 1
-    endif
-  endif
-  let file = expand(file)
-  let file = substitute(file, '\\', '/', 'g')
+augroup ExtViewer_
+  au!
+  au VimLeave * call s:EVLeave()
+augroup END
 
-  if a:mode == 0
-    if exists('*EVwrite_'.suffix)
-      exec 'let line = EVwrite_'.suffix.'("'.file.'", '.fline.', '. lline.')'
-    else
-      let line = EVwrite_template(file, fline, lline)
-    endif
-  endif
-  call EVAddTempFileList(file)
-  if suffix =~ 'html\|htm'
-    let file = substitute(file, ' ', '%20', 'g')
-  elseif has('unix')
-    let file = escape(file, ' ')
-  endif
-  let cmd = g:ExtViewer_cmd
-  if exists('g:ExtViewer_'.suffix)
-    exec 'let cmd = g:ExtViewer_'.suffix
-  endif
-  let cmd = substitute(cmd, '%f', escape(file, '\\'), 'g')
-  let cmd = substitute(cmd, '%l', escape(line, '\\'), 'g')
-  if s:MSWindows
-    let cmd = iconv(cmd, &enc, 'cp932')
-  endif
-  let cmd = escape(cmd, '%#')
-  silent! exec cmd
-endfunction
-
-" 外部ビューアに渡すファイルを出力(template)
-function! EVwrite_template(file, fline, lline)
-  let line = line('.')
-  let glist = getline(a:fline, a:lline)
-  let cnvCR = &fileformat == 'dos'
-  let toFenc = &fileencoding
-  " fencと改行を元ファイルと同一にする。
-  let loop = len(glist)
-  for i in range(loop)
-    let glist[i] = iconv(glist[i], &enc, toFenc)
-    if cnvCR
-      let glist[i] = substitute(glist[i], '$', '\r', '')
-    endif
-  endfor
-  call writefile(glist, a:file, 'b')
-  return line
-endfunction
-
-" 外部ビューアに渡すファイルを出力
-function! EVwrite_txt(file, fline, lline)
+" 外部ビューアに渡すファイルを出力(txt)
+silent! function EVwrite_txt(file, fline, lline)
   let suffix = 'txt'
   let removeMarker = g:EV_RemoveMarker
   if !exists('g:JpFormatMarker') || g:JpFormatMarker == ''
@@ -1610,15 +1511,89 @@ function! EVwrite_txt(file, fline, lline)
   return line
 endfunction
 
-command! -count EVJumpPage silent! exec 'normal! '.((count-1)*g:EV_CountLines).'gg'
+" Windows?
+let s:MSWindows = has('win95') + has('win16') + has('win32') + has('win64')
+let s:tmpname = tempname()
 
-augroup ExtViewer
-  au!
-  au VimLeave * call s:EVLeave()
-augroup END
+" 外部ビューアに渡すファイルを出力(template)
+function! s:EVwrite_template(file, fline, lline)
+  let line = line('.')
+  let glist = getline(a:fline, a:lline)
+  let cnvCR = &fileformat == 'dos'
+  let toFenc = &fileencoding
+  " fencと改行を元ファイルと同一にする。
+  let loop = len(glist)
+  for i in range(loop)
+    let glist[i] = iconv(glist[i], &enc, toFenc)
+    if cnvCR
+      let glist[i] = substitute(glist[i], '$', '\r', '')
+    endif
+  endfor
+  call writefile(glist, a:file, 'b')
+  return line
+endfunction
+
+function! s:ExtViewer(mode, fline, lline, ...)
+  let fline = a:fline
+  let lline = a:lline
+  let file = ''
+  let line = 0
+  let suffix = ''
+
+  if a:0
+    let suffix = a:1
+  endif
+  if suffix == ''
+    let suffix = expand("%:e")
+  endif
+  if suffix == 'howm' || suffix == 'nvl'
+    let suffix = expand("txt")
+  endif
+  if a:mode == 0
+    if exists('g:EV_Tempname_'.suffix)
+      exec 'let s:tmpname = '. 'g:'.'EV_Tempname_'.suffix
+    endif
+    let file = s:tmpname . '.'. suffix
+  else
+    let file = expand('%:p')
+  endif
+  if line == 0
+    let line = line('.')
+    if fline != 1 || lline != line('$')
+      let line = 1
+    endif
+  endif
+  let file = expand(file)
+  let file = substitute(file, '\\', '/', 'g')
+
+  if a:mode == 0
+    if exists('*EVwrite_'.suffix)
+      exec 'let line = EVwrite_'.suffix.'("'.file.'", '.fline.', '. lline.')'
+    else
+      let line = s:EVwrite_template(file, fline, lline)
+    endif
+    call s:EVAddTempFileList(file)
+  endif
+  if suffix =~ 'html\|htm'
+    let file = substitute(file, ' ', '%20', 'g')
+  elseif has('unix')
+    let file = escape(file, ' ')
+  endif
+  let cmd = g:ExtViewer_cmd
+  if exists('g:ExtViewer_'.suffix)
+    exec 'let cmd = g:ExtViewer_'.suffix
+  endif
+  let cmd = substitute(cmd, '%f', escape(file, '\\'), 'g')
+  let cmd = substitute(cmd, '%l', escape(line, '\\'), 'g')
+  if s:MSWindows
+    let cmd = iconv(cmd, &enc, 'cp932')
+  endif
+  let cmd = escape(cmd, '%#')
+  silent! exec cmd
+endfunction
 
 let s:flist = []
-function! EVAddTempFileList(file)
+function! s:EVAddTempFileList(file)
   if count(s:flist, a:file) > 0
     return
   endif
