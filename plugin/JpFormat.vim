@@ -103,9 +103,15 @@ endif
 
 " 行頭禁則
 if !exists('JpKinsoku')
-  let JpKinsoku = '-}>）―～－ｰ］！？゛゜ゝゞ｡｣､･ﾞﾟ'.',)\]｝、〕〉》」』】〟’”'.'ヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ々'.'‐'.'?!'.'・:;'.'。.'.'…‥'
+  let JpKinsoku = '-}>）―～－ｰ］！？゛゜ゝゞ｡｣､･ﾞﾟ'.',)\]｝、〕〉》」』】〟’”'.'ヽヾー々'.'‐'.'?!'.'・:;'.'。.'.'…‥'
   if &enc == 'utf-8'
-    let JpKinsoku .= '〙〗｠»'.'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'.'〻'.'〜'.'‼⁇⁈⁉'.'゠'.'–'.'—〳〴〵'
+    let JpKinsoku .= '〙〗｠»'.'〻'.'〜'.'‼⁇⁈⁉'.'゠'.'–'.'—〳〴〵'
+  endif
+  if !exists('JpKinsokuYouon') || JpKinsokuYouon
+    let JpKinsoku .= 'ァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎ'
+    if &enc == 'utf-8'
+      let JpKinsoku .= 'ゕゖㇰㇱㇳㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ'
+    endif
   endif
   let JpKinsoku = '['.JpKinsoku.']'
 endif
@@ -206,6 +212,8 @@ command! -count                  JpFormatToggle   call s:JpFormatToggle()
 command!                         JpFormatGqToggle call s:JpFormatGqToggle()
 " マーカーが存在するなら自動整形をON
 command!                         JpSetAutoFormat  call JpSetAutoFormat()
+" 整形にgqを呼び出す
+command! -bang -range            JpFormatGq       call s:JpFormatGq(<line1>, <line2>, <bang>0)
 
 " コマンド実行時にJpFormatをオフにする代替コマンド
 function! JpFormat_cmd(cmd)
@@ -1214,7 +1222,6 @@ endfunction
 "=============================================================================
 "  Description: gqを使用したJpFormat形式の整形
 "=============================================================================
-command! -bang -range JpFormatGq call s:JpFormatGq(<line1>, <line2>, <bang>0)
 function! s:JpFormatGq(fline, lline, mode, ...)
   call JpFormatGqPre()
 
