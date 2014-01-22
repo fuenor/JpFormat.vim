@@ -405,6 +405,12 @@ function! s:lib.format_lines(lnum, count)
 
   let twj = s:strdisplaywidth(join(lines, '')) + 1
   let l = self.vimformatexpr(lnum, a:count, twj)
+
+  let JpKinsokuO = g:JpKinsoku
+  if exists('g:JpKinsokuO')
+    let JpKinsokuO = g:JpKinsokuO
+  endif
+  let JpKinsokuO = substitute(JpKinsokuO, '[-;:,.]', '', 'g')
   while 1
     let line = getline(lnum)
     let compat = jpfmt_compat
@@ -436,6 +442,8 @@ function! s:lib.format_lines(lnum, count)
         let line2 = substitute(line2[llen :], '^\s*', '', '')
         " 分割位置が日本語の行までJpFormatの整形を使用
         if line1 =~ '[^\x00-\xff]$' || line2 =~ '^[^\x00-\xff]'
+          let idx += 1
+        elseif line2 =~ '^[[:alnum:]]\+'.JpKinsokuO
           let idx += 1
         else
           break
@@ -502,7 +510,7 @@ function! s:lib.format_lines(lnum, count)
   return line('$') - prev_lines
 endfunction
 
-function s:count(lines, expr)
+function! s:count(lines, expr)
   for l in a:lines
     if l =~ a:expr
       return 1

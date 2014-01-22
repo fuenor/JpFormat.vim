@@ -911,6 +911,7 @@ function! JpFormatStr(str, clidx, ...)
   if exists('g:JpKinsokuO')
     let JpKinsokuO = g:JpKinsokuO
   endif
+  let subJpKinsoku = substitute(g:JpKinsoku, ':;,.-', '', 'g')
   let JpNoDivN = g:JpNoDivN.g:JpNoDiv.'\{2}$'
   let cmode = g:JpFormatCountMode
   let chars  = (b:JpCountChars)*cmode
@@ -1065,11 +1066,15 @@ function! JpFormatStr(str, clidx, ...)
       if outstr && ochars >= 0
         " let ofs = s:strdisplaywidth(matchstr(str, '\%'.(chars+ochars).'v.')) > 1
         let ofs = 0
+        if str =~ '[\x00-\xff]\+$' && lstr =~ '^'.g:JpKinsoku
+          let oword = matchstr(str, '[[:alnum:]]\+$')
+          if oword != str
+            let str = strpart(str, 0, strlen(str)-strlen(oword))
+            let lstr = oword.lstr
+          endif
+        endif
         if s:strdisplaywidth(str) > chars+ochars+ofs
           let ostr = matchstr(str, '.'.g:JpKinsoku.'*'.JpKinsokuO.'\+$')
-          " if ostr =~ '^[\x00-\xff]'
-          "   let ostr = matchstr(ostr, '^.\zs.*')
-          " endif
           let str = strpart(str, 0, strlen(str)-strlen(ostr))
           let lstr = ostr.lstr
 
