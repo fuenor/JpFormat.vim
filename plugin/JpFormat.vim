@@ -395,11 +395,16 @@ function! s:JpFormatEnter()
   if g:JpFormatCursorMovedI && b:JpFormatGqMode == 0
     let l:JpAutoJoin = 0
   endif
-  if l:JpAutoJoin
+  if l:JpAutoJoin && g:JpFormatCursorMovedI == 0
     let b:jpf_modified = &modified
     let b:jpf_prevtime = localtime()
     if b:jpf_modified == 0
-      let b:jpf_prevstr = getline(1, line('$'))
+      " 10M以上は処理が重くなるので更新チェックをしない
+      if g:JpAutoJoin == 0 || g:JpFormatCursorMovedI == 1 || getfsize(expand('%')) > 10485760
+        let b:jpf_prevstr = []
+      else
+        let b:jpf_prevstr = getline(1, line('$'))
+      endif
     endif
   endif
   if b:jpformat > 0
@@ -439,7 +444,7 @@ function! s:JpFormatLeave()
   endif
   let l:JpAutoJoin = g:JpAutoJoin
   if l:JpAutoJoin
-    if b:jpf_modified == 0 && b:jpf_prevstr == getline(1, line('$'))
+    if b:jpf_modified == 0 && b:jpf_prevstr != [] && b:jpf_prevstr == getline(1, line('$'))
       let save_cursor = getpos(".")
       let ptime = localtime()
       let utime = localtime() - b:jpf_prevtime + 1

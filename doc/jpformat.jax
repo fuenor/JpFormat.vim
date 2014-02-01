@@ -80,8 +80,15 @@ gqコマンドとしてはjpvim.vimのほうが違和感がないかもしれま
   " ぶら下げを行わない日本語対応gqコマンドとして使用する
   set formatexpr=jpvim#formatexpr()
 
-また日本語文書への対応として行頭が 　 (全角スペース)か「 で始まった場合は段落
-開始とみなして処理を行います。
+またjpvimの時だけ拗音と促音(っァなど)を通常文字として扱うことができます。
+ドキュメントなどでなるべく追い出し処理を行いたくない時に使用してください。
+>
+  " jpvim.vimだけ拗音と促音を通常文字扱い
+  let g:jpvim_remove_youon = 1
+
+------------------------------------------------------------------------------
+jpfmt.vim、jpvim.vimの共通設定になりますが日本語文書への対応として、行頭が 　
+(全角スペース)か「 で始まった場合は段落開始とみなして処理を行います。
 このためgq8jのように複数行をまとめて処理しても　(全角スペース)か「で始まる行
 は連結されません。
 ユーザー指定の段落開始行は jpfmt_paragraph_regexp の正規表現で指定可能です。
@@ -89,11 +96,14 @@ gqコマンドとしてはjpvim.vimのほうが違和感がないかもしれま
   " 段落開始とみなす正規表現
   let jpfmt_paragraph_regexp = '^[　「]'
 
+------------------------------------------------------------------------------
 現在のカーソル行から次の段落行までを整形させることもできます。
 gqpなどにマップして使用すると便利かもしれません。
 >
   nnoremap <silent> gqp :<C-u>call jpfmt#gqp()<CR>
+  nnoremap <silent> gqp :<C-u>call jpvim#gqp()<CR>
 
+------------------------------------------------------------------------------
 次章からは連結マーカーを利用した「擬似ソフトラップ」を行うためのコマンド群につ
 いての解説になります。
 単にgqコマンドとしてしか使用しないけれども、禁則処理対象文字を変更したいなどの
@@ -162,6 +172,9 @@ NOTE:デフォルトの「連結マーカー」にはタブ記号が使われて
 
 ------------------------------------------------------------------------------
 .vimrc でのキーマップ設定例
+
+JpFormatの性質上よく使う整形コマンドはキーにマップして使うほうが便利です。
+実際には JpFormat と JpFormatToggleをマップすれば十分使えます。
 >
   " 日本語の行の連結時には空白を入力しない。
   set formatoptions+=mM
@@ -169,40 +182,16 @@ NOTE:デフォルトの「連結マーカー」にはタブ記号が使われて
   " 現在行を整形
   nnoremap <silent> gl :JpFormat<CR>
   vnoremap <silent> gl :JpFormat<CR>
-  " 現在行が整形対象外でも強制的に整形
-  nnoremap <silent> gL :JpFormat!<CR>
-  vnoremap <silent> gL :JpFormat!<CR>
 
   " 自動整形のON/OFF切替
   " 30gC の様にカウント指定すると、
   " 現バッファのみ折り返し文字数を指定されたカウントに変更
   nnoremap <silent> gC :JpFormatToggle<CR>
-
-  " カーソル位置の分割行をまとめてヤンク
-  nnoremap <silent> gY :JpYank<CR>
-  vnoremap <silent> gY :JpYank<CR>
-  " カーソル位置の分割行をまとめて連結
-  nnoremap <silent> gJ :JpJoin<CR>
-  vnoremap <silent> gJ :JpJoin<CR>
-
-  " 外部ビューアを起動する
-  nnoremap <silent> <F8> :JpExtViewer<CR>
 
 この例だと gl で整形することになります。
 コマンドは 3gl の用にカウント指定や、ビジュアルモードで範囲を指定可能です。
 単純な連結は通常通り J で、分割された行(パラグラフ)は gJ でまとめて連結可能で
 す。
-実際には JpFormat と JpFormatToggleをマップすれば十分使えます。
->
-  " 日本語の行の連結時には空白を入力しない。
-  set formatoptions+=mM
-  " 現在行を整形
-  nnoremap <silent> gl :JpFormat<CR>
-  vnoremap <silent> gl :JpFormat<CR>
-  " 自動整形のON/OFF切替
-  " 30gC の様にカウント指定すると、
-  " 現バッファのみ折り返し文字数を指定されたカウントに変更
-  nnoremap <silent> gC :JpFormatToggle<CR>
 
 個人的には JpFormatAll や JpCountPagesもよく使うのでキーマップしています。
 >
