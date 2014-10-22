@@ -1485,7 +1485,7 @@ command! -count                  EVJumpPage  silent! exec 'normal! '.((count-1)*
 
 augroup ExtViewer_
   au!
-  au VimLeave * call s:EVLeave()
+  au VimLeavePre * call s:EVLeave()
 augroup END
 
 " 外部ビューアに渡すファイルを出力(txt)
