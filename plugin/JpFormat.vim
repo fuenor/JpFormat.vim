@@ -1489,7 +1489,8 @@ augroup ExtViewer_
 augroup END
 
 " 外部ビューアに渡すファイルを出力(txt)
-silent! function EVwrite_txt(file, fline, lline)
+if !exists("*EVwrite_txt")
+function EVwrite_txt(file, fline, lline)
   let suffix = 'txt'
   let removeMarker = g:EV_RemoveMarker
   if !exists('g:JpFormatMarker') || g:JpFormatMarker == ''
@@ -1527,6 +1528,7 @@ silent! function EVwrite_txt(file, fline, lline)
   call writefile(glist, a:file, 'b')
   return line
 endfunction
+endif
 
 " Windows?
 let s:MSWindows = has('win95') + has('win16') + has('win32') + has('win64')
