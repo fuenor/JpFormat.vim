@@ -932,7 +932,7 @@ function! JpFormatStr(str, clidx, ...)
   for l in range(len(a:str))
     let addline = l < clidx ? 1 : 0
     let lstr = a:str[l]
-    if lstr == '' || lstr =~ b:JpFormatExclude
+    if lstr =~ '^\s*$' || lstr =~ b:JpFormatExclude
       let addcr += addline
       call add(fstr, lstr)
       continue
