@@ -211,7 +211,7 @@ command! -count                  JpFormatToggle   call s:JpFormatToggle()
 " gqモードをトグル
 command!                         JpFormatGqToggle call s:JpFormatGqToggle()
 " マーカーが存在するなら自動整形をON
-command!                         JpSetAutoFormat  call JpSetAutoFormat()
+command! -bang                   JpSetAutoFormat  call JpSetAutoFormat(<bang>0)
 " 整形にgqを呼び出す
 command! -bang -range            JpFormatGq       call s:JpFormatGq(<line1>, <line2>, <bang>0)
 
@@ -553,14 +553,21 @@ function! JpSetAutoFormat(...)
     let sl = search(g:JpFormatMarker."$", 'W')
   endwhile
   call setpos('.', save_cursor)
-  if a:0 == 0
+  if a:0 == 0 || a:1 == 0
     let b:jpformat = sl != 0 ? 1 : 0
+  elseif a:1 == '1'
+    let b:jpformat = 1
+    let sl = 1
+  endif
+  if b:jpformat || (a:0 && a:1 == 1)
+    call s:preCmd()
   endif
   return sl
 endfunction
 
 " 指定範囲以降を整形
 function! s:JpFormat(fline, lline, mode, ...)
+  call s:preCmd()
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
@@ -587,6 +594,7 @@ endfunction
 
 " 全文整形
 function! s:JpFormatAll(fline, lline, mode, ...)
+  call s:preCmd()
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
@@ -679,9 +687,7 @@ endfunction
 
 " パラグラフをフォーマット
 function! s:JpFormatP(fline, lline, mode)
-  if b:jpformat == 0
-    return
-  endif
+  call s:preCmd()
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
@@ -711,6 +717,7 @@ function! s:JpFormatP(fline, lline, mode)
 endfunction
 
 function! s:JpJoinAll(fline, lline, ...)
+  call s:preCmd()
   let mode = ''
   if b:JpFormatGqMode
     let mode = '(gq)'
@@ -723,6 +730,7 @@ endfunction
 
 " 指定範囲のパラグラフを連結
 function! s:JpJoin(fline, lline, ...)
+  call s:preCmd()
   let save_cursor = getpos(".")
   let fline = a:fline
   let lline = a:lline
@@ -751,6 +759,7 @@ endfunction
 
 " 現在行のパラグラフをヤンク
 function! s:JpYank(fline, lline, ...)
+  call s:preCmd()
   let save_cursor = getpos(".")
   let fline = a:fline
   let lline = a:lline
@@ -1233,6 +1242,7 @@ endfunction
 "  Description: gqを使用したJpFormat形式の整形
 "=============================================================================
 function! s:JpFormatGq(fline, lline, mode, ...)
+  call s:preCmd()
   call JpFormatGqPre()
 
   let b:jpformat = 1
@@ -1409,6 +1419,11 @@ endfunction
 
 function! s:JpJoinGq(fline, lline, mode)
   call s:JpFormatGq(a:fline, a:lline, a:mode, 'join')
+endfunction
+
+function! s:preCmd()
+  call s:JpFormatAltKey()
+  setlocal nolinebreak
 endfunction
 
 "=============================================================================
