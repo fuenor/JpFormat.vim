@@ -214,6 +214,7 @@ command!                         JpFormatGqToggle call s:JpFormatGqToggle()
 command! -bang                   JpSetAutoFormat  call JpSetAutoFormat(<bang>0)
 " 整形にgqを呼び出す
 command! -bang -range            JpFormatGq       call s:JpFormatGq(<line1>, <line2>, <bang>0)
+command!                         JpFormatAltKey   call s:JpFormatAltKey()
 
 " コマンド実行時にJpFormatをオフにする代替コマンド
 function! JpFormat_cmd(cmd)
@@ -226,6 +227,7 @@ if exists('g:fudist')
   let s:debug = g:fudist
 endif
 
+if !exists('g:JpFormatAltKeyLocal') || g:JpFormatAltKeyLocal == 0
 " J代替
 if (!exists('JpAltJ') || JpAltJ) && JpFormatMarker != ''
   nnoremap <silent> J :<C-u>call JpAltJ()<CR>
@@ -236,6 +238,20 @@ endif
 if (!exists('JpAltCv') || JpAltCv)
   nnoremap <silent> <expr> <C-v> JpAltCv()
 endif
+endif
+
+function! s:JpFormatAltKeyLocal(...)
+  " J代替
+  if (!exists('g:JpAltJ') || g:JpAltJ) && g:JpFormatMarker != ''
+    nnoremap <silent> <buffer> J :<C-u>call JpAltJ()<CR>
+    vnoremap <silent> <buffer> J :call JpAltJ()<CR>
+  endif
+
+  " <C-v>代替
+  if (!exists('g:JpAltCv') || g:JpAltCv)
+    nnoremap <silent> <buffer> <expr> <C-v> JpAltCv()
+  endif
+endfunction
 
 " <DEL>代替(デフォルト無効)
 if (exists('JpAltDEL') && JpAltDEL) && JpFormatMarker != '' && JpFormatCursorMovedI
@@ -1422,8 +1438,10 @@ function! s:JpJoinGq(fline, lline, mode)
 endfunction
 
 function! s:preCmd()
-  call s:JpFormatAltKey()
   setlocal nolinebreak
+  if exists('g:JpFormatAltKeyLocal') && g:JpFormatAltKeyLocal == 1
+    call s:JpFormatAltKeyLocal()
+  endif
 endfunction
 
 "=============================================================================
