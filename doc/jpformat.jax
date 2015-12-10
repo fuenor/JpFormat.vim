@@ -62,6 +62,12 @@ c:\temp\JpFormat.vim-masterであった場合は.vimrcで次のようにパス�
 >
   set runtimepath+=c:/temp/JpFormat.vim-master
 
+(注意)
+linebreakオプションを.vimrc等で有効化している場合は、ファイル読込時や編集時に
+見た目上の整形が行なわれますが、これはJpFormat.vimの機能とバッティングします。
+JpFormat.vimを使用したいファイル(ファイルタイプ)に対しては、autocmd等で
+linebreakを無効化することをおすすめします。
+
 2.1 gqコマンドとして使用する場合の設定 			*jpformat_install_gq*
 
 JpFormat.vimにはgqコマンドとして使用可能な、日本語禁則処理対応の整形プラグイン
@@ -231,20 +237,26 @@ JpFormatCursorMovedI = 1 に設定すると挿入モードで一文字入力す�
 
 自動整形が有効になるのは以下の場合です。
 
-    * バッファ内でJpFormat等のコマンドを実行した後
-    * バッファローカルな変数 b:jpformat を 1 に設定した時
-    * 特定の拡張子のファイルで整形済みの行があるファイルを開く場合
+    * バッファ内でJpFormat等のコマンドを実行する
+    * バッファ内でJpFormatToggleを実行して切替
 
-以下を .vimrcに追加すると、次回からはtxtファイルに「連結マーカー+改行」があれ
-ば自動整形モードが最初から有効になります。 >
+また以下を .vimrcに追加すると、次回からはtxtファイルに「連結マーカー+改行」が
+あれば自動整形モードが最初から有効になります。 >
+
   " txtファイルで「連結マーカー+改行」が有ったら自動整形を有効にする
-  au BufRead *.txt  JpSetAutoFormat
+  au BufRead *.txt JpSetAutoFormat
 
-自動整形自体は :JpFormatToggleを実行してON/OFF切替可能ですが、バッファローカル
-なオプション b:jpformat = 0 に設定してもそのバッファのみ自動整形はオフになりま
-す。
+「連結マーカー+改行」の有無にかかわらず自動整形を有効にしたい場合は、!を付加し
+ます。 >
 
-常に自動整形をオフにしたい場合は以下のように設定します。
+  " txtファイルでは常に自動整形を有効にする
+  au BufRead *.txt JpSetAutoFormat!
+
+なお状態はバッファローカルなオプション b:jpformat で制御されているため
+let b:jpformat = 1 を設定することでも、そのバッファのみ自動整形をオンにするこ
+とが可能です。
+
+コマンド実行後も常に自動整形をオフにしたい場合は以下のように設定します。
 >
   " 整形コマンドを使用したら自動整形もON
   let JpAutoFormat = 0
