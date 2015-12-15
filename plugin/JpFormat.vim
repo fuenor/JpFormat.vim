@@ -214,7 +214,8 @@ command!                         JpFormatGqToggle call s:JpFormatGqToggle()
 command! -bang                   JpSetAutoFormat  call JpSetAutoFormat(<bang>0)
 " 整形にgqを呼び出す
 command! -bang -range            JpFormatGq       call s:JpFormatGq(<line1>, <line2>, <bang>0)
-command!                         JpFormatAltKey   call s:JpFormatAltKey()
+" バッファローカルキーを有効化
+command!                         JpFormatBufLocalKey call s:JpFormatBufLocalKey()
 
 " コマンド実行時にJpFormatをオフにする代替コマンド
 function! JpFormat_cmd(cmd)
@@ -227,7 +228,11 @@ if exists('g:fudist')
   let s:debug = g:fudist
 endif
 
-if !exists('g:JpFormatAltKeyLocal') || g:JpFormatAltKeyLocal == 0
+" J や <C-v>をバッファローカルにオーバーライド
+if !exists('g:JpFormatBufLocalKey')
+  let g:JpFormatBufLocalKey = 0
+endif
+if g:JpFormatBufLocalKey == 0
 " J代替
 if (!exists('JpAltJ') || JpAltJ) && JpFormatMarker != ''
   nnoremap <silent> J :<C-u>call JpAltJ()<CR>
@@ -240,7 +245,7 @@ if (!exists('JpAltCv') || JpAltCv)
 endif
 endif
 
-function! s:JpFormatAltKeyLocal(...)
+function! s:JpFormatBufLocalKey(...)
   " J代替
   if (!exists('g:JpAltJ') || g:JpAltJ) && g:JpFormatMarker != ''
     nnoremap <silent> <buffer> J :<C-u>call JpAltJ()<CR>
@@ -1439,8 +1444,8 @@ endfunction
 
 function! s:preCmd()
   setlocal nolinebreak
-  if exists('g:JpFormatAltKeyLocal') && g:JpFormatAltKeyLocal == 1
-    call s:JpFormatAltKeyLocal()
+  if g:JpFormatBufLocalKey == 1
+    call s:JpFormatBufLocalKey()
   endif
 endfunction
 
