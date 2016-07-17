@@ -17,9 +17,6 @@ if exists("g:loaded_JpFormat") && g:loaded_JpFormat && !exists('fudist')
 endif
 let g:JpFormat_version = s:version
 let g:loaded_JpFormat = 1
-if &cp
-  finish
-endif
 
 " 文字数指定を半角単位にする
 " 1:半角
@@ -1489,9 +1486,6 @@ if exists('disable_ExtViewer') && disable_ExtViewer
   finish
 endif
 let loaded_ExtViewer = 1
-if &cp
-  finish
-endif
 
 if !exists('g:ExtViewer_cmd')
   let ExtViewer_cmd = '!start "'.$windir.'/notepad.exe" "%f"'
