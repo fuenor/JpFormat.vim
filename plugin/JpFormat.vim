@@ -65,6 +65,10 @@ endif
 if !exists('JpFormatCursorMovedI_BS')
   let JpFormatCursorMovedI_BS = 1
 endif
+" タイプライタースクロール
+if !exists('JpFormatTypewriterScroll')
+  let JpFormatTypewriterScroll = 0
+endif
 " 挿入モードへ移行したら自動連結
 " (JpFormatCursorMovedI=0の時のみ有効)
 "  1 : カーソル位置以降を自動連結
@@ -387,6 +391,9 @@ function! s:JpFormatEnter()
   if !exists('b:jpformat')
     let b:jpformat = 0
   endif
+  if s:isTypewriterScroll()
+    exe 'normal! zz'
+  endif
   if g:JpCountChars_Use_textwidth
     let b:JpCountChars = &textwidth/g:JpFormatCountMode
   endif
@@ -515,6 +522,9 @@ endfunction
 function! s:JpFormatCursorMovedI_()
   if !exists('b:jpformat')
     let b:jpformat=0
+  endif
+  if s:isTypewriterScroll()
+    exe 'normal! zz'
   endif
   if g:JpFormatCursorMovedI == 0 || b:jpformat <= 0 || g:JpFormatMarker == ''
     return
@@ -1444,6 +1454,23 @@ function! s:preCmd()
   if g:JpFormatBufLocalKey == 1
     call s:JpFormatBufLocalKey()
   endif
+endfunction
+
+function! JpFormatTypewriterScrollToggle(...)
+  if g:JpFormatCursorMovedI == 0
+    echo 'JpFormat : CursorMoved mode is not active.'
+    return
+  endif
+  if a:0
+    let g:JpFormatTypewriterScroll = a:1
+  else
+    let g:JpFormatTypewriterScroll = g:JpFormatTypewriterScroll ? 0 : 1
+  endif
+  echo 'Typewriter scroll : '.(g:JpFormatTypewriterScroll ? 'ON' : 'OFF')<CR>
+endfunction
+
+function! s:isTypewriterScroll()
+  return (g:JpFormatTypewriterScroll || (exists('b:typewriterscroll') && b:typewriterscroll)) && g:JpFormatCursorMovedI
 endfunction
 
 "=============================================================================
