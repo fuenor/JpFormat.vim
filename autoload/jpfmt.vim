@@ -352,7 +352,7 @@ function! s:lib.formatexpr()
   return 0
 endfunction
 
-function! s:lib.jpformat_normal_mode(lnum, count)
+function! s:lib.jpformat_normal_mode(lnum, v:count)
   let self.textwidth = self.comp_textwidth(1)
   if self.textwidth == 0
     return
@@ -378,7 +378,7 @@ let s:lib.jpfmt_compat = 1
 " 2  : JpFormat.vim
 " 3  : JpFormat.vim + autofmt.vim
 " 4  : autofmt.vim
-function! s:lib.format_lines(lnum, count)
+function! s:lib.format_lines(lnum, v:count)
   let lnum = a:lnum
   let prev_lines = line('$')
   let jpfmt_compat = self.get_opt('jpfmt_compat')
@@ -524,7 +524,7 @@ function! s:lib.is_comment(line)
   return leader =~ '[[:graph:]]'
 endfunction
 
-function! s:lib.vimformatexpr(lnum, count, ...)
+function! s:lib.vimformatexpr(lnum, v:count, ...)
   let lnum = a:lnum
   let lines = line('$')
   if a:count == 0 || lnum > line('$')

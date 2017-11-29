@@ -266,11 +266,11 @@ endif
 
 " J コマンド代替
 function! JpAltJ() range
-  let cnt = count
+  let cnt = v:count
   let fline = a:firstline
   let lline = a:lastline
-  if count
-    let lline = lline + count - 1
+  if v:count
+    let lline = lline + v:count - 1
   endif
   if fline != lline
     let cnt = lline-fline+1
@@ -1252,8 +1252,8 @@ function! s:JpCountPages(fline, lline, mode, ...)
 endfunction
 
 function! s:JpFormatToggle()
-  if count > 0
-    let b:JpCountChars = count
+  if v:count > 0
+    let b:JpCountChars = v:count
     echo 'JpFormat : Chars = '.b:JpCountChars
     return
   endif
@@ -1540,7 +1540,7 @@ endif
 " 外部ビューア起動
 command! -nargs=* -range=% -bang ExtViewer   call s:ExtViewer(<bang>0, <line1>, <line2>, <f-args>)
 command! -nargs=* -range=% -bang JpExtViewer call s:ExtViewer(<bang>0, <line1>, <line2>, 'txt')
-command! -count                  EVJumpPage  silent! exec 'normal! '.((count-1)*g:EV_CountLines).'gg'
+command! -count                  EVJumpPage  silent! exec 'normal! '.((v:count-1)*g:EV_CountLines).'gg'
 
 augroup ExtViewer_
   au!
