@@ -352,14 +352,14 @@ function! s:lib.formatexpr()
   return 0
 endfunction
 
-function! s:lib.jpformat_normal_mode(lnum, v:count)
+function! s:lib.jpformat_normal_mode(lnum, lines)
   let self.textwidth = self.comp_textwidth(1)
   if self.textwidth == 0
     return
   endif
 
   let offset = 0
-  let para = self.get_vim_paragraph(a:lnum, a:lnum + a:count - 1)
+  let para = self.get_vim_paragraph(a:lnum, a:lnum + a:lines - 1)
   for [i, lines] in para
     let lnum = a:lnum + i + offset
     " let offset += self.format_lines(lnum, len(lines))
@@ -367,7 +367,7 @@ function! s:lib.jpformat_normal_mode(lnum, v:count)
   endfor
 
   " The cursor is left on the first non-blank of the last formatted line.
-  let lnum = a:lnum + (a:count - 1) + offset
+  let lnum = a:lnum + (a:lines - 1) + offset
   silent! execute printf('keepjumps normal! %dG', lnum)
 endfunction
 
@@ -378,22 +378,22 @@ let s:lib.jpfmt_compat = 1
 " 2  : JpFormat.vim
 " 3  : JpFormat.vim + autofmt.vim
 " 4  : autofmt.vim
-function! s:lib.format_lines(lnum, v:count)
+function! s:lib.format_lines(lnum, lines)
   let lnum = a:lnum
   let prev_lines = line('$')
   let jpfmt_compat = self.get_opt('jpfmt_compat')
   let tw = self.textwidth
 
   if jpfmt_compat == -1
-    let l = self.vimformatexpr(lnum, a:count, tw)
+    let l = self.vimformatexpr(lnum, a:lines, tw)
     return line('$') - prev_lines
   endif
-  let lines = getline(lnum, lnum + a:count - 1)
+  let lines = getline(lnum, lnum + a:lines - 1)
   if jpfmt_compat == 1
     if s:count(lines, '[^\x00-\xff]') == 0
-      let l = self.vimformatexpr(lnum, a:count, tw)
+      let l = self.vimformatexpr(lnum, a:lines, tw)
       return line('$') - prev_lines
-    elseif a:count == 1 && s:strdisplaywidth(getline(lnum)) <= tw
+    elseif a:lines == 1 && s:strdisplaywidth(getline(lnum)) <= tw
       return line('$') - prev_lines
     endif
   endif
@@ -404,7 +404,7 @@ function! s:lib.format_lines(lnum, v:count)
   endif
 
   let twj = s:strdisplaywidth(join(lines, '')) + 1
-  let l = self.vimformatexpr(lnum, a:count, twj)
+  let l = self.vimformatexpr(lnum, a:lines, twj)
 
   let JpKinsokuO = g:JpKinsoku
   if exists('g:JpKinsokuO')
@@ -524,10 +524,10 @@ function! s:lib.is_comment(line)
   return leader =~ '[[:graph:]]'
 endfunction
 
-function! s:lib.vimformatexpr(lnum, v:count, ...)
+function! s:lib.vimformatexpr(lnum, lines, ...)
   let lnum = a:lnum
   let lines = line('$')
-  if a:count == 0 || lnum > line('$')
+  if a:lines == 0 || lnum > line('$')
     return 1
   endif
   let saved_tw  = &textwidth
@@ -539,7 +539,7 @@ function! s:lib.vimformatexpr(lnum, v:count, ...)
     exe 'setlocal textwidth='.a:1
   endif
   setlocal formatoptions+=mM
-  silent! exe 'silent! normal! '.a:count.'gqq'
+  silent! exe 'silent! normal! '.a:lines.'gqq'
   exe 'setlocal textwidth='.saved_tw
   exe 'setlocal formatexpr='.saved_fex
   exe 'setlocal formatoptions='.saved_fo
