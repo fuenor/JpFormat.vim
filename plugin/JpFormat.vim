@@ -41,6 +41,10 @@ endif
 if !exists('JpCountOverChars')
   let JpCountOverChars = 1
 endif
+" 禁則処理の最大追い出し字数
+if !exists('JpCountOutChars')
+  let JpCountOutChars = 2
+endif
 " 原稿用紙換算計算時に削除するルビ等の正規表現
 if !exists('JpCountDeleteReg')
   let JpCountDeleteReg = '\[.\{-}\]\|<.\{-}>\|《.\{-}》\|［.\{-}］\|｜'
@@ -958,6 +962,7 @@ function! JpFormatStr(str, clidx, ...)
   let cmode = g:JpFormatCountMode
   let chars  = (b:JpCountChars)*cmode
   let ochars = (b:JpCountOverChars)*cmode
+  let outchars = g:JpCountOutChars > 0 ? (g:JpCountOutChars)*cmode : chars
   let catmarker = a:0 ? '' : g:JpFormatMarker
   let addcr = 0
   let subspc = []
@@ -1111,18 +1116,30 @@ function! JpFormatStr(str, clidx, ...)
         if str =~ '[\x00-\xff]\+$' && lstr =~ '^'.g:JpKinsoku
           let oword = matchstr(str, '[[:alnum:]]\+$')
           if oword != str
+            " let _str = strpart(str, 0, strlen(str)-strlen(oword))
+            " if s:strdisplaywidth(_str) < chars-outchars
+            "   let ostr = substitute(str, '.\{'.chars.'}', '', '')
+            " endif
             let str = strpart(str, 0, strlen(str)-strlen(oword))
             let lstr = oword.lstr
           endif
         endif
         if s:strdisplaywidth(str) > chars+ochars+ofs
           let ostr = matchstr(str, '.'.g:JpKinsoku.'*'.JpKinsokuO.'\+$')
+          let _str = strpart(str, 0, strlen(str)-strlen(ostr))
+          if s:strdisplaywidth(_str) < chars-outchars
+            let ostr = substitute(str, '.\{'.chars.'}', '', '')
+          endif
           let str = strpart(str, 0, strlen(str)-strlen(ostr))
           let lstr = ostr.lstr
 
           " 行末禁則文字を全て次行へ移動
           if str !~ '[\x00-\xff]$' && str =~ g:JpKinsokuE.'\+$'
             let ostr = matchstr(str, g:JpKinsokuE.'\+$')
+            let _str = strpart(str, 0, strlen(str)-strlen(ostr))
+            if s:strdisplaywidth(_str) < chars-outchars
+              let ostr = substitute(str, '.\{'.chars.'}', '', '')
+            endif
             let str = strpart(str, 0, strlen(str)-strlen(ostr))
             let lstr = ostr.lstr
           endif

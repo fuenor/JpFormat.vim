@@ -651,6 +651,9 @@ Windowsで内部エンコーディングがcp932の場合はmisc/kinsoku-cp932.v
   " 禁則処理の最大ぶら下がり字数
   let JpCountOverChars = 1
 
+  " 禁則処理の最大追い出し字数
+  let JpCountOutChars = 2
+
   " 半角一文字分オーバーしても折り返し処理をする/しない
   let JpFormatHankakuOver = 0
 
