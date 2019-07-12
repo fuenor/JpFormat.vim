@@ -43,7 +43,7 @@ if !exists('JpCountOverChars')
 endif
 " 禁則処理の最大追い出し字数
 if !exists('JpCountOutChars')
-  let JpCountOutChars = 2
+  let JpCountOutChars = 4
 endif
 " 原稿用紙換算計算時に削除するルビ等の正規表現
 if !exists('JpCountDeleteReg')
